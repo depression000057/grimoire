@@ -1,0 +1,14 @@
+{
+  "name": "tirnanog",
+  "owner": {
+    "name": "ティルナノーグ"
+  },
+  "description": "ティルナノーグ受講生のグリモワールの配布元",
+  "plugins": [
+    {
+      "name": "grimoire",
+      "description": "ティルナノーグ受講生のグリモワール。Threads 集客と売れる note を、講師FB・セミナーで自分専用に育つナレッジで作る",
+      "source": "./plugins/grimoire"
+    }
+  ]
+}

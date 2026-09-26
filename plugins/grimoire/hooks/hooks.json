@@ -1,0 +1,28 @@
+{
+  "description": "グリモワール: 本体への近道（.grimoire）を今の版へ向けて使い方を伝え、初回はこのパソコンに登録し、チャットに貼られた長い文を原文のまま保存する",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/save-long-prompt.sh\"",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}
