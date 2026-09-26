@@ -1,7 +1,7 @@
 ---
 name: grimoire
-description: ティルナノーグ受講生のグリモワール。Threads投稿とnote（タイトル・本文・ローンチとエバーの導線）を、本人の設定と手元で育つナレッジで作る。文字起こし・講師FB・数字・直した文を渡されたら、言われなくても覚えて次から使う。「グリモワール起動」「始動」で悩み別のメニューを出す。「Threads」「note」「ローンチ」「伸びない」「設定」でも起動。
-allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(sh .grimoire/scripts/register.sh) Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
+description: ティルナノーグ受講生のグリモワール。Threads投稿とnote・LP・ステップメール（タイトル・本文・ローンチとエバーの導線）を、本人の設定と手元で育つナレッジで作る。文字起こし・講師FB・数字・直した文を渡されたら、言われなくても覚えて次から使う。「グリモワール起動」「始動」で悩み別のメニューを出す。「Threads」「note」「ローンチ」「伸びない」「設定」でも起動。
+allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(python3 .grimoire/scripts/tn_design_check.py *) Bash(sh .grimoire/scripts/register.sh) Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
 ---
 
 # グリモワール（grimoire）
@@ -10,9 +10,9 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 
 - 使う場所: Claude Code（Claude デスクトップアプリの Code タブを含む）。受講生がグリモワール用に開いたフォルダ（`${CLAUDE_PROJECT_DIR}`）が作業フォルダ
 - 作業フォルダには、フックが作る本体への近道 `.grimoire`（このスキルのフォルダ `${CLAUDE_SKILL_DIR}` を指す）がある（ふだんは会話の最初、初めて開いた会話では最初の入力の時に作られる）。手順書の中の `<スキルのフォルダ>` は `.grimoire`、`<マイナレッジ>` は `ティルナノーグ_マイナレッジ`、`<作業フォルダ>` は `.` と読み替える
-- 道具は、作業フォルダ（最初の場所）で、次の形のまま動かす（この形だけ、受講生に確認を出さずに動かせるように許可してある。`cd` で別の場所に移ってから動かさない）: `python3 .grimoire/scripts/tn_kb.py <コマンド> ティルナノーグ_マイナレッジ …`・`python3 .grimoire/scripts/tn_check.py …`・`python3 .grimoire/scripts/tn_paste.py …`
+- 道具は、作業フォルダ（最初の場所）で、次の形のまま動かす（この形だけ、受講生に確認を出さずに動かせるように許可してある。`cd` で別の場所に移ってから動かさない）: `python3 .grimoire/scripts/tn_kb.py <コマンド> ティルナノーグ_マイナレッジ …`・`python3 .grimoire/scripts/tn_check.py …`・`python3 .grimoire/scripts/tn_paste.py …`・`python3 .grimoire/scripts/tn_design_check.py …`
 - 手順書（`references/…`・`assets/…`）は、`.grimoire/references/…` のように近道から読む
-- 受講生の画面に確認を出さないために: 道具は1回に1つずつ動かす（`for` 文・`&&`・`;`・`|` でつながない。許可されているのは `python3 .grimoire/scripts/tn_kb.py …`・`tn_check.py …`・`tn_paste.py …` と `sh .grimoire/scripts/register.sh` だけ）。ファイルは `cat`・`ls` ではなく、読む道具・探す道具で読む。ファイルは消さない（消す操作は確認が出る）
+- 受講生の画面に確認を出さないために: 道具は1回に1つずつ動かす（`for` 文・`&&`・`;`・`|` でつながない。許可されているのは `python3 .grimoire/scripts/tn_kb.py …`・`tn_check.py …`・`tn_paste.py …`・`tn_design_check.py …` と `sh .grimoire/scripts/register.sh` だけ）。ファイルは `cat`・`ls` ではなく、読む道具・探す道具で読む。ファイルは消さない（消す操作は確認が出る）
 - ファイルを書くのは `ティルナノーグ_マイナレッジ/` と `ティルナノーグ_制作物/` の中だけ（ここだけ確認なしで書けるように許可してある）。フォルダを作る時も `mkdir` ではなく、道具（`tn_kb.py init` など）か、ファイルを書く道具で中のファイルごと作る
 
 ## このエージェントの約束
@@ -42,6 +42,7 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | 「Threads の投稿作って」「10本作って」「ツリーにして」「この投稿直して」 | 1 Threads | `references/modes/1_threads.md` |
 | 「note 書いて」「有料 note」「タイトル案」「セールスレター」 | 2 note | `references/modes/2_note.md` |
 | 「ローンチしたい」「販売期間の計画」「エバーにしたい」「導線を作りたい」 | 3 ローンチ→エバー | `references/modes/3_launch-evergreen.md` |
+| 「セールスレター」「LP」「申し込みページ」「ステップメール」「X のポスト」「リールの冒頭」「教育が足りているか見て」「訴求を整理して」「この文章が売れない理由を見て」 | 売れる型（型を選び、設計シートの枠を埋めてから書く） | `references/sales-patterns/guide.md` |
 
 取り込み（4）と振り返り（5）を制作（1〜3）より先に置く理由: 新しいフィードバックや数字を先にカードにしてから書けば、その場で反映されるため。素材と一緒に「これで投稿作って」と言われた時も、先に取り込んでから書く。
 
@@ -115,6 +116,7 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 |---|---|
 | `references/environments.md` | Python が動かない時・保存先に迷った時 |
 | `references/modes/0_setup.md` 〜 `6_start.md` | 各モードに入った時（全文） |
+| `references/sales-patterns/guide.md` | 売る文章（note の無料部分と本編・LP・セールスレター・ステップメール・SNS の投稿・冒頭の一言）を型で組む時。型は同じフォルダの各ファイル、設計シートは `assets/sales-design-sheet.md`、点検は `scripts/tn_design_check.py` |
 | `references/knowledge/threads-posting.md` | Threads 投稿を書く時 |
 | `references/knowledge/threads-account-ops.md` | アカウント設計・運用・分析の相談の時 |
 | `references/knowledge/sales-launch-evergreen.md` | 導線・ローンチ・エバー化の時 |

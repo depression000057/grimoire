@@ -24,6 +24,8 @@
 
 書く前に設計表を作る。設計の無い長文は、途中で読者の気持ちが置き去りになるため。
 
+**型を選ぶ**: `references/sales-patterns/letter-structures.md` の選び方の表で、売る側（無料部分）の型を1つ（L0〜L6）と、本編の型を1つ（B1〜B3）選ぶ。`assets/sales-design-sheet.md` を `ティルナノーグ_制作物/` に写し、選んだ型の枠を型の順番どおりに並べて、枠ごとに中身か飛ばした理由を書く（`references/sales-patterns/guide.md` の手順3）。書き終えたら `python3 .grimoire/scripts/tn_design_check.py <設計シート> --draft <本文>` で点検する。note の媒体の決まり（有料ライン・タイトル・冒頭・字数）は `note-writing.md`。下の章の表と中身の素材の表は、設計シートと一緒に作る。
+
 **章の表**
 
 | 章 | 読者の気持ち（入る時→出る時） | この章で伝えること | 型 | 字数 |

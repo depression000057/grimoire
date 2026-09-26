@@ -25,6 +25,8 @@
 3. カード: stage `launch` `evergreen` `threads-cta` `account`
 4. `references/knowledge/sales-launch-evergreen.md` の全文
 
+ローンチ中に出すメール・LINE の配信は `references/sales-patterns/step-mail.md`（M1〜M4）の型で、申し込みページ・LP は `references/sales-patterns/letter-structures.md` の売る側の型で組む（どちらも `references/sales-patterns/guide.md` の手順で設計シートを作ってから書く）。
+
 ## §3 ローンチ計画
 
 **期間**: 最初のローンチは7〜14日を目安にする。短すぎると告知が届かず、長すぎると期間を区切る意味が薄れるため。本人の投稿ペースで回せる長さに合わせる。
