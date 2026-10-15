@@ -23,7 +23,8 @@
 1. `00_わたしの設定.md`（売りたいもの・読者1人・センターピン）
 2. `40_実績/` の数字
 3. カード: stage `launch` `evergreen` `threads-cta` `account`
-4. `references/knowledge/sales-launch-evergreen.md` の全文
+4. `references/knowledge/sales-launch-evergreen.md` の全文（2回目以降のローンチ・再販・売るための動画・値段の段で迷った時は §9）
+5. LINE を使っている、または使う予定なら `references/knowledge/line-operations.md`（どこで人が減っているかは §1、ステップ配信は §4、届ける前の点検は §6）
 
 ローンチ中に出すメール・LINE の配信は `references/sales-patterns/step-mail.md`（M1〜M4）の型で、申し込みページ・LP は `references/sales-patterns/letter-structures.md` の売る側の型で組む（どちらも `references/sales-patterns/guide.md` の手順で設計シートを作ってから書く）。
 
