@@ -1,0 +1,21 @@
+{
+  "name": "grimoire",
+  "version": "2.4.0",
+  "description": "ティルナノーグ受講生のグリモワール。Threads 集客と売れる note を、講師FB・セミナーで自分専用に育つナレッジで作る",
+  "author": {
+    "name": "ティルナノーグ"
+  },
+  "skills": "./skills/",
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "グリモワール",
+    "shortDescription": "Threads 投稿と売れる note を、自分専用に育つナレッジで作る",
+    "developerName": "ティルナノーグ",
+    "category": "Productivity",
+    "defaultPrompt": [
+      "グリモワール起動",
+      "Threads の投稿を5本作って",
+      "有料 note のタイトル案を出して"
+    ]
+  }
+}

@@ -8,7 +8,7 @@
 
 | 見分けること | 確かめ方 |
 |---|---|
-| ファイルを読み書きできるか | Claude Code なら読み書きできる。作業フォルダに `ティルナノーグ_マイナレッジ/` があるかを見る |
+| ファイルを読み書きできるか | Claude Code と Codex なら読み書きできる。作業フォルダに `ティルナノーグ_マイナレッジ/` があるかを見る |
 | Python が動くか | コマンドを実行する道具・コードを実行する道具があるか。あれば `python3 --version`（Windows は `python --version`）を1回だけ試す |
 
 確かめた結果は、受講生に長々と説明しない。困る時（ファイルが書けない等）だけ1行で伝える。
@@ -18,16 +18,18 @@
 | 環境 | ファイル | Python | マイナレッジの育ち方 |
 |---|---|---|---|
 | **Claude Code（標準）**。Claude デスクトップアプリの Code タブ・黒い画面の claude・エディタの拡張機能 | 作業フォルダを読み書きできる | 入っていれば動く（無い時は §5） | 自動（作業フォルダに保存） |
-| Claude ブラウザ版・スマホアプリ・Cowork・ChatGPT | 環境による | 環境による | 講座の標準ではない。動くところまで動いたうえで、「覚えたことを自動で貯めるには、Claude デスクトップアプリの Code タブでグリモワールのフォルダを開いてください」と1回だけ伝える |
+| **Codex**。ChatGPT デスクトップアプリの Codex・Codex CLI | 作業フォルダを読み書きできる | 入っていれば動く（無い時は §5） | 自動（作業フォルダに保存）。動き方の違いは SKILL.md の「Codex で動いている時」 |
+| Claude ブラウザ版・スマホアプリ・Cowork・ChatGPT（Codex 以外の画面） | 環境による | 環境による | 講座の標準ではない。動くところまで動いたうえで、「覚えたことを自動で貯めるには、Claude デスクトップアプリの Code タブでグリモワールのフォルダを開いてください」と1回だけ伝える |
 
 ## §3 保存先と本体の置き場所
 
-- 作業フォルダ: 受講生がグリモワール用に Claude Code で開いたフォルダ（`${CLAUDE_PROJECT_DIR}`）。この直下に2つのフォルダを使う
+- 作業フォルダ: 受講生がグリモワール用に Claude Code か Codex で開いたフォルダ（Claude Code では `${CLAUDE_PROJECT_DIR}`、Codex では会話を始めたフォルダ）。この直下に2つのフォルダを使う
   - `ティルナノーグ_マイナレッジ/`: 設定・カード・原文・実績・取り込み状況（育つもの）
   - `ティルナノーグ_制作物/`: 作った投稿・note・計画（毎回の成果物）
 - 本体（このスキル）: Claude Code のプラグインとして、講座の配布元（git の置き場）から入っている。置き場所は Claude Code が管理し、講座が新しい版を出すと自動で入れ替わる。本体のフォルダの中には保存しない（入れ替えの時に消えるため）
 - 登録: 作業フォルダの設定だけでは、本体は初めて開いた会話でしか読み込まれない。その会話の最初の入力で、フックがこのパソコンのこの作業フォルダに登録する（`scripts/register.sh` が `plugin install grimoire@tirnanog --scope local` を実行する）。フックで登録できなかった時は `sh .grimoire/scripts/register.sh` を Claude が実行する。フォルダを別の場所へ移した時は、作業フォルダの `CLAUDE.md` の手順で登録する
 - 道具の呼び方: 作業フォルダで `python3 .grimoire/scripts/tn_kb.py …`。`.grimoire` は、フックが作り直す本体への近道（ふだんは会話の最初、初めての会話では最初の入力の時）で、版が変わっても同じ形で呼べる。symlink が作れない環境（Windows の既定の設定など）では、目印ファイル `.grimoire-copy-of` の入った本体のコピーになり、版が変わるとフックが作り直す。受講生が同じ名前の物を置いていたら、フックは触らずに知らせてくる。作業フォルダの設定（`.claude/settings.local.json`）で、この形の道具と、マイナレッジ・制作物への書き込み、グリモワールを呼ぶことだけを、確認なしで動かせるように許可してある
+- Codex の時: 本体は Codex のプラグインとして、作業フォルダの `.codex/config.toml` に書いた講座の配布元から入る。Codex は会話を始める時に配布元を見に行き、新しい版があれば入れ替える（登録は要らない）。近道 `.grimoire` と長い文の保存は、Claude Code と同じフック（Codex 用の設定 `hooks/codex-hooks.json` から呼ぶ）が行う。フックは受講生が一度「信頼する」を選ぶまで動かない。新しい版が届かない状態が続くと、フックが受講生への1行の案内を伝えてくる
 
 ## §4 ファイルが書けない時（半自動）
 
@@ -82,6 +84,9 @@
 | Claude デスクトップアプリの Code タブは、選んだフォルダで Claude Code を動かす | Claude Code Docs「Desktop」 https://code.claude.com/docs/en/desktop （「Project folder: select the folder or repository Claude works in.」） |
 | Claude のスキルは Free を含む全プランで使え、コード実行をオンにして zip を入れる。description は200文字まで | Claude Help Center「Use skills in Claude」 https://support.claude.com/en/articles/12512180-using-skills-in-claude ・「Creating custom skills」 https://support.claude.com/en/articles/12512198-creating-custom-skills |
 | Claude のプラグインは有料プラン。同じアカウントの Claude Code にも同期される | Claude Help Center「Use plugins in Claude」 https://support.claude.com/en/articles/13837440-use-plugins-in-claude |
+| Codex は ChatGPT の Free・Go・Plus・Pro・Business・Edu・Enterprise に含まれ、ChatGPT デスクトップアプリと Codex CLI で使える。プラグインは表で「限定」とあり、どのプランで講座の配布元のプラグインを使えるかは書かれていない（要確認。2026-10-17 確認） | OpenAI「Codex pricing」 https://learn.chatgpt.com/docs/pricing （「ChatGPT Work and Codex are included in your ChatGPT Free, Go, Plus, Pro, Business, Edu, or Enterprise plan.」） |
+| Codex のプラグインは `.codex-plugin/plugin.json` と配布元の `.agents/plugins/marketplace.json` で配る。フックはプラグインの中に置け、`PLUGIN_ROOT`・`PLUGIN_DATA`（互換の `CLAUDE_PLUGIN_ROOT` も）が渡る。フックは受講生が信頼するまで動かない。自動更新は公式の説明に書かれておらず、更新の命令は `codex plugin marketplace upgrade` | OpenAI「Build plugins」 https://developers.openai.com/plugins/build/plugins ・「Hooks」 https://learn.chatgpt.com/docs/hooks |
+| Codex は作業フォルダの `.codex/config.toml` に書いた配布元とプラグインを、会話を始める時に取ってきて入れ、新しい版があれば入れ替える。信頼したフックは、フックの設定が同じなら版が変わっても信頼されたまま | Codex CLI 0.153.4 での実測（2026-10-17。公式の説明には無い動き。ChatGPT デスクトップアプリでは要確認） |
 
 ## §8 受講生への伝え方
 

@@ -6,11 +6,24 @@
 #    初めて開いた会話では本体の読み込みが会話の最初のフックより後になり、session-start.sh が動かないため。
 # 3. このパソコンへの登録がまだなら、登録する（skills/grimoire/scripts/register.sh。登録済みなら何もしない）。
 # 標準入力: Claude Code が渡す JSON（prompt・session_id など）。標準出力: Claude に渡す案内（必要な時だけ）。
+#
+# Codex からは GRIMOIRE_HOST=codex を付けて呼ぶ（hooks/codex-hooks.json）。Codex も同じ形の JSON（prompt・session_id）を渡す。
+# Codex では 3 の登録を行わない（Codex は講座の配布元を作業フォルダの .codex/config.toml から入れるので、
+# Claude Code の登録の命令は要らず、動かすと Claude Code にまで登録してしまうため）。
+
+plugin_root="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+CLAUDE_PLUGIN_ROOT="$plugin_root"
+export CLAUDE_PLUGIN_ROOT
+host="${GRIMOIRE_HOST:-claude}"
+context_file="session-context.md"
+if [ "$host" = "codex" ]; then
+  context_file="session-context-codex.md"
+fi
 
 THRESHOLD_BYTES=4000  # 日本語でおよそ1,300字。講師の添削とセミナーの一部を一緒に貼ると超える長さ
 project_dir="${CLAUDE_PROJECT_DIR:-$PWD}"
 inbox="$project_dir/ティルナノーグ_マイナレッジ/_受け取り"
-data_dir="${CLAUDE_PLUGIN_DATA:-${CLAUDE_CODE_PLUGIN_CACHE_DIR:-$HOME/.claude/plugins}/data/grimoire-tirnanog}"
+data_dir="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CLAUDE_CODE_PLUGIN_CACHE_DIR:-$HOME/.claude/plugins}/data/grimoire-tirnanog}}"
 
 tmp_file="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/grimoire-prompt-$$.json")"
 cat >"$tmp_file" || { rm -f "$tmp_file"; exit 0; }
@@ -32,7 +45,7 @@ rm -f "$tmp_file" 2>/dev/null
 # 2. 近道
 case "$(sh "${CLAUDE_PLUGIN_ROOT}/hooks/link-shortcut.sh" 2>/dev/null </dev/null)" in
   changed)
-    cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-context.md" 2>/dev/null
+    cat "${CLAUDE_PLUGIN_ROOT}/hooks/$context_file" 2>/dev/null
     ;;
   conflict)
     # 同じ会話の中では1回だけ伝える
@@ -40,13 +53,17 @@ case "$(sh "${CLAUDE_PLUGIN_ROOT}/hooks/link-shortcut.sh" 2>/dev/null </dev/null
     notice="$data_dir/conflict-notified-$key"
     if [ -z "$session_id" ] || [ "$(cat "$notice" 2>/dev/null)" != "$session_id" ]; then
       mkdir -p "$data_dir" 2>/dev/null && printf '%s\n' "$session_id" >"$notice" 2>/dev/null
-      printf '%s\n' "【グリモワール】作業フォルダに .grimoire という名前の別の物があるため、本体への近道を作れませんでした（受講生の物なので触っていません）。この会話では、道具を python3 \"${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/tn_kb.py\" … の形で動かしてください（受講生に確認が出ます）。受講生には「フォルダの中の .grimoire という名前の物を別の名前に変えると、確認なしで動くようになります」と1回だけ伝えてください。"
+      if [ "$host" = "codex" ]; then
+        printf '%s\n' "【グリモワール】作業フォルダに .grimoire という名前の別の物があるため、本体への近道を作れませんでした（受講生の物なので触っていません）。この会話では、道具を python3 \"${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/tn_kb.py\" … の形で動かしてください。受講生には「フォルダの中の .grimoire という名前の物を別の名前に変えると、いつもの形で動くようになります」と1回だけ伝えてください。"
+      else
+        printf '%s\n' "【グリモワール】作業フォルダに .grimoire という名前の別の物があるため、本体への近道を作れませんでした（受講生の物なので触っていません）。この会話では、道具を python3 \"${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/tn_kb.py\" … の形で動かしてください（受講生に確認が出ます）。受講生には「フォルダの中の .grimoire という名前の物を別の名前に変えると、確認なしで動くようになります」と1回だけ伝えてください。"
+      fi
     fi
     ;;
 esac
 
-# 3. 登録
-case "$(sh "${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/register.sh" --from-hook 2>/dev/null </dev/null)" in
+# 3. 登録（Claude Code だけ）
+[ "$host" = "codex" ] || case "$(sh "${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/register.sh" --from-hook 2>/dev/null </dev/null)" in
   registered)
     printf '%s\n' "【グリモワール】このパソコンのこの作業フォルダに、グリモワールを登録しました。次の会話からもそのまま使え、講座が新しい版を出すと自動で新しくなります。受講生への返事の最後に、このことを1行で伝えてください。"
     ;;

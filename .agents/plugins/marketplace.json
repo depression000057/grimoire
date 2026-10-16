@@ -1,0 +1,25 @@
+{
+  "name": "tirnanog",
+  "interface": {
+    "displayName": "ティルナノーグ"
+  },
+  "owner": {
+    "name": "ティルナノーグ"
+  },
+  "plugins": [
+    {
+      "name": "grimoire",
+      "source": {
+        "source": "local",
+        "path": "./plugins/grimoire"
+      },
+      "description": "ティルナノーグ受講生のグリモワール。Threads 集客と売れる note を、講師FB・セミナーで自分専用に育つナレッジで作る",
+      "version": "2.4.0",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

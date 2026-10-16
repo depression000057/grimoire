@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GRIMOIRE_HOST=codex sh \"${PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "GRIMOIRE_HOST=codex sh \"${PLUGIN_ROOT}/hooks/save-long-prompt.sh\"",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}
