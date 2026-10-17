@@ -1,7 +1,7 @@
 ---
 name: grimoire
-description: ティルナノーグ受講生のグリモワール。Threads投稿とnote・LP・ステップメール・LINE配信と占いの鑑定書を、本人の設定と手元で育つナレッジで作る。文字起こし・講師FB・数字・直した文を渡されたら、言われなくても覚えて次から使う。「グリモワール起動」「始動」で悩み別のメニューを出す。「Threads」「note」「ローンチ」「伸びない」「設定」「鑑定」でも起動。
-allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(python3 .grimoire/scripts/tn_design_check.py *) Bash(sh .grimoire/scripts/register.sh) Bash(python3 .grimoire/scripts/kantei/numerology.py *) Bash(python3 .grimoire/scripts/kantei/tarot.py *) Bash(python3 .grimoire/scripts/kantei/check_post.py *) Bash(python3 .grimoire/scripts/kantei/build_diagnosis_page.py *) Bash(python3 .grimoire/scripts/kantei/weekly_report.py *) Bash(python3 .grimoire/scripts/kantei/frames.py *) Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
+description: ティルナノーグ受講生のグリモワール。Threads投稿とnote・LP・ステップメール・LINE配信と占いの鑑定書を、本人の設定と手元で育つナレッジで作る。文字起こし・講師FB・数字・直した文を渡されたら、言われなくても覚えて次から使う。「グリモワール起動」「始動」で悩み別のメニューを出す。「Threads」「note」「ローンチ」「伸びない」「設定」「鑑定」「グリモワール更新」でも起動。
+allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(python3 .grimoire/scripts/tn_design_check.py *) Bash(sh .grimoire/scripts/register.sh) Bash(sh .grimoire/scripts/update.sh) Bash(python3 .grimoire/scripts/kantei/numerology.py *) Bash(python3 .grimoire/scripts/kantei/tarot.py *) Bash(python3 .grimoire/scripts/kantei/check_post.py *) Bash(python3 .grimoire/scripts/kantei/build_diagnosis_page.py *) Bash(python3 .grimoire/scripts/kantei/weekly_report.py *) Bash(python3 .grimoire/scripts/kantei/frames.py *) Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
 ---
 
 # グリモワール（grimoire）
@@ -41,6 +41,8 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | 受講生から来た物・言い方（例） | モード | 手順書 |
 |---|---|---|
 | 「グリモワール起動」「グリモワール始動」「起動」「始動」「メニュー」「何ができる？」「何から始めればいい？」／何をしたいかがまだ決まっていない相談 | 6 始動（メニューを出して案内する） | `references/modes/6_start.md` |
+| 「グリモワール更新」「更新して」「最新にして」「新しい勉強会は入った？」 | 更新（今すぐ最新の版を取ってきて、新しく入った勉強会を見せる） | このファイルの「登録と更新」 |
+| 「第1回の内容を教えて」「勉強会で話していた〇〇は？」「コンセプトの回の資料」 | 講座の勉強会の資料を読んで答える | `references/course/索引.md` の「勉強会の資料」→ その回の `00_この回について.md` |
 | 「はじめて」「設定して」「プロフィール作りたい」 | 0 はじめて設定 | `references/modes/0_setup.md` |
 | 文字起こし・講義の資料・字幕のファイルが添付された／ファイルの場所が書かれた／長い文が貼られた（フックが「長い文を保存しました」と伝えた時を含む） | 4 育てる（大量の素材） | `references/modes/4_grow.md` §11 |
 | 講師のコメント・添削・「ここは〜にしましょう」が貼られた／本人が直した文を貼った | 4 育てる | `references/modes/4_grow.md` |
@@ -61,7 +63,7 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | 優先 | 層 | 場所 | 中身 |
 |---|---|---|---|
 | 1 | マイナレッジ | 作業フォルダの `ティルナノーグ_マイナレッジ/` | 本人の設定・本人への講師FB・本人の実績・本人が直した文・取り込んだ文字起こし |
-| 2 | 講座ナレッジ | `references/course/` | セミナーと講師の全体向けFBから作ったカード（講座が更新すると自動で新しくなる） |
+| 2 | 講座ナレッジ | `references/course/` | セミナー・勉強会と講師の全体向けFBから作ったカードと、勉強会ごとの資料（`references/course/勉強会/<日付_第N回_テーマ>/` のマインドマップ・スライドの中身・文字起こし。講座が更新すると自動で新しくなる） |
 | 3 | エンジン | `references/knowledge/`・`assets/golden-samples/` | 基本の手順とお手本 |
 
 - **絶対ルール**（`references/quality/absolute-rules.md`）は、どの層からも上書きできない
@@ -118,6 +120,11 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 
 グリモワールの本体（このスキル・手順書・講座ナレッジ）は、講座が新しい版を出すと自動で新しくなる（Claude Code のプラグインの自動更新。新しい版は次の会話から使われる）。受講生に入れ替えや更新の操作を頼まない。何が変わったかを聞かれたら、`CHANGELOG.md` の一番上の版を1〜3行で伝える。本人のマイナレッジと制作物は、更新しても変わらない。
 
+**「グリモワール更新」と言われた時（Claude Code）**: 受講生に一言断ってから、作業フォルダで `sh .grimoire/scripts/update.sh` を1回だけ実行する（許可済みなので確認は出ない。待たずに今すぐ最新の版を取ってくる）。
+- `updated <前の版> <新しい版>` と出たら: 「最新の版（<新しい版>）を受け取りました。新しい会話を開くと使えます」と伝え、新しい版の `CHANGELOG.md` の一番上と、`references/course/索引.md` の「勉強会の資料」の一覧（新しい回が上）を、受け取った版の中から読んで短く見せる（新しい版の場所は `~/.claude/plugins/cache/tirnanog/grimoire/<新しい版>/skills/grimoire/`）
+- `latest <版>` と出たら: 「もう最新の版（<版>）です」と伝え、今の版の勉強会の資料の一覧を見せる
+- `failed: …` と出たら: 理由をそのまま伝え、「インターネットにつながった状態で、少し待ってからもう一度『グリモワール更新』と送ってください。何もしなくても、話しかけていれば自動でも届きます」と添える
+
 **Codex の時**: 登録はしない（フックも登録しない）。本体は、作業フォルダの `.codex/config.toml` に書いた講座の配布元から、Codex が会話を始める時に入れて、新しい版も取ってくる。新しい版が届いていない状態が続くと、フックが「新しい版が出ていますが…」と伝えてくるので、その時だけ、フックの案内どおり返事の最後に受講生へ伝える。案内の中の `codex plugin marketplace upgrade tirnanog` は、受講生がはっきり「更新して」と頼んだ時だけ実行する（自分からは実行しない）。グリモワールが見当たらない会話では、作業フォルダの `AGENTS.md` の手順で案内する。
 
 ## ファイル一覧
@@ -134,7 +141,8 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | `references/kantei/`・`assets/kantei/`・`scripts/kantei/` | 占い・鑑定のモード（7）の手順書・書式・道具。入口は `references/modes/7_kantei.md` |
 | `references/knowledge/note-writing.md` | note を設計・執筆する時 |
 | `references/quality/*.md` | 品質工程の各段 |
-| `references/course/索引.md` | 各工程でカードを読む時 |
+| `references/course/索引.md` | 各工程でカードを読む時・勉強会の資料を探す時（末尾の「勉強会の資料」） |
+| `references/course/勉強会/` | 勉強会の回ごとの資料。受講生がその回のテーマを相談した時は、カードに加えて、その回のマインドマップ（`01_マインドマップ.md`）を読む。文字起こし（`03_文字起こし.md`）は長いので、必要な所だけ探して読む |
 | `assets/golden-samples/` | 書く直前（お手本） |
 | `assets/my-knowledge-template/`・`assets/card-template.md` | マイナレッジを作る時・カードを書く時 |
 | `scripts/tn_kb.py`・`tn_check.py`・`tn_paste.py` | 道具（使い方は各ファイルの `--help`） |
