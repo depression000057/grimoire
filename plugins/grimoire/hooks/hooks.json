@@ -1,5 +1,5 @@
 {
-  "description": "グリモワール: 本体への近道（.grimoire）を今の版へ向けて使い方を伝え、初回はこのパソコンに登録し、チャットに貼られた長い文を原文のまま保存する",
+  "description": "グリモワール: 会話の最初に講座の新しい版を受け取り、本体への近道（.grimoire）を今の版へ向けて使い方を伝え、初回はこのパソコンに登録し、チャットに貼られた長い文を原文のまま保存する",
   "hooks": {
     "SessionStart": [
       {
@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
-            "timeout": 10
+            "timeout": 100
           }
         ]
       }

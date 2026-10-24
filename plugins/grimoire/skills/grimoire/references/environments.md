@@ -78,7 +78,7 @@
 
 | 事実 | 確かめ先 |
 |---|---|
-| グリモワールの本体は Claude Code のプラグインとして配る。講座の配布元の自動更新をオンにしておくと、最初の入力から最大10分のうちに新しい版が届き、次の会話から新しい版が使われる（受講生の操作は要らない） | Claude Code Docs「Install and manage plugins」 https://code.claude.com/docs/en/plugins/install ・「Plugin loading reference」の「When auto-update runs」 https://code.claude.com/docs/en/plugins/loading |
+| グリモワールの本体は Claude Code のプラグインとして配る。講座の配布元の自動更新をオンにしておくと、最初の入力から最大10分のうちに新しい版が届き、次の会話から新しい版が使われる（受講生の操作は要らない）。2.6.0 からは、それより先に会話の最初のフックが配布元の版を確かめ、新しければその場で受け取って近道 `.grimoire` を向け直すので、開いたその会話から新しい版の手順書・講座の資料・道具が使われる | Claude Code Docs「Install and manage plugins」 https://code.claude.com/docs/en/plugins/install ・「Plugin loading reference」の「When auto-update runs」 https://code.claude.com/docs/en/plugins/loading |
 | 作業フォルダに最初から入っていた設定で有効にしたプラグインは、配布元の外からは取ってこない。配布元の中に相対パスで置いた本体は、配布元を初めて取ってきた会話で読み込まれる。次の会話からも読み込むには、インストールの記録（登録）が要る | Claude Code Docs「Plugin loading reference」の「Enabled in project settings but not installed」 https://code.claude.com/docs/en/plugins/loading ・「Marketplace reference」の「Relative path plugin source」 https://code.claude.com/docs/en/plugins/marketplace-reference |
 | Claude Code は Pro・Max・Team・Enterprise・Console のアカウントで使える。無料プランには含まれない | Claude Code Docs「Advanced setup」 https://code.claude.com/docs/en/setup （「The free claude.ai plan does not include Claude Code access.」） |
 | Claude デスクトップアプリの Code タブは、選んだフォルダで Claude Code を動かす | Claude Code Docs「Desktop」 https://code.claude.com/docs/en/desktop （「Project folder: select the folder or repository Claude works in.」） |

@@ -14,7 +14,7 @@
         "path": "./plugins/grimoire"
       },
       "description": "ティルナノーグ受講生のグリモワール。Threads 集客と売れる note を、講師FB・セミナーで自分専用に育つナレッジで作る",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"

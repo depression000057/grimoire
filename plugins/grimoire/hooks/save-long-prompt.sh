@@ -4,6 +4,7 @@
 #    取り込めるようにするため。短い入力は保存しない）。後の処理が時間切れになっても残るように、最初に行う。
 # 2. 近道 .grimoire がまだ無い・古い時は作り直して、使い方の案内も渡す（link-shortcut.sh）。
 #    初めて開いた会話では本体の読み込みが会話の最初のフックより後になり、session-start.sh が動かないため。
+#    この会話の途中で新しい版へ移っていて、まだ Claude に伝えていなければ伝える（upgrade-notice.sh。Claude Code だけ）。
 # 3. このパソコンへの登録がまだなら、登録する（skills/grimoire/scripts/register.sh。登録済みなら何もしない）。
 # 標準入力: Claude Code が渡す JSON（prompt・session_id など）。標準出力: Claude に渡す案内（必要な時だけ）。
 #
@@ -61,6 +62,7 @@ case "$(sh "${CLAUDE_PLUGIN_ROOT}/hooks/link-shortcut.sh" 2>/dev/null </dev/null
     fi
     ;;
 esac
+[ "$host" = "codex" ] || sh "${CLAUDE_PLUGIN_ROOT}/hooks/upgrade-notice.sh" 2>/dev/null </dev/null
 
 # 3. 登録（Claude Code だけ）
 [ "$host" = "codex" ] || case "$(sh "${CLAUDE_PLUGIN_ROOT}/skills/grimoire/scripts/register.sh" --from-hook 2>/dev/null </dev/null)" in
