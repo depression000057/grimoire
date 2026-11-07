@@ -88,6 +88,30 @@ VERIFY_FACT_PATTERNS: Tuple[Tuple[str, "re.Pattern[str]"], ...] = (
         re.compile(r"(この|その|同じ|こちらの)(方法|やり方|手順)で[^。！？!?]{0,20}ようにして"),
     ),
 )
+# 守りに入ってふわっとさせた言い方（absolute-rules.md §6・pipeline.md 段6c）。決まりで止めている言い方ではないので、
+# 言い切れる所は言い切り、何がもらえるか・何が分かるかを具体の名前で書く。ぼかす理由が本当にある所だけ残す
+FUZZY_TERMS: Tuple[str, ...] = (
+    "かもしれません",
+    "かもしれない",
+    "気がします",
+    "ではないでしょうか",
+    "と言われています",
+    "場合もあります",
+    "人もいます",
+    "少しでも",
+    "参考になれば",
+    "お役に立てれば",
+    "いかがでしたか",
+    "ヒントを",
+    "きっかけに",
+    "寄り添",
+    "サポートします",
+    "整えます",
+    "豊かさ",
+    "流れが変わ",
+    "について話します",
+    "についてお話し",
+)
 FIRST_PERSON_TERMS: Tuple[str, ...] = ("私", "わたし", "僕", "ぼく", "俺", "自分")
 CTA_TERMS: Tuple[str, ...] = ("LINE", "公式LINE", "フォロー", "購入", "こちら", "リンク")
 ACTION_CTA_TERMS: Tuple[str, ...] = ("してみてください", "やってみてください", "試してみて", "保存して", "保存しておく", "コメントで", "コメント欄")
@@ -379,6 +403,31 @@ def verify_fact_review_issues(
                     details,
                 )
             )
+    return sorted(issues, key=lambda issue: (int(issue.context["line"]), str(issue.context["term"])))
+
+
+def fuzzy_review_issues(
+    source_lines: Sequence[Tuple[int, str]],
+    context: Dict[str, Any],
+) -> List[Issue]:
+    issues: List[Issue] = []
+    for term in FUZZY_TERMS:
+        for line_number, line in source_lines:
+            if term not in line:
+                continue
+            details = dict(context)
+            details.update({"kind": "fuzzy", "line": line_number, "term": term})
+            issues.append(
+                Issue(
+                    "FUZZY",
+                    f"{line_number}行目の「{term}」: 守りに入ってふわっとしていませんか。"
+                    "読者が「それ何言ってるの？」「で、何がもらえるの？」とならないよう、言い切れる所は言い切り、"
+                    "届く物・分かること・変化を具体の名前で書いてください（absolute-rules.md §6・pipeline.md 段6c）。"
+                    "ぼかす理由が絶対ルールにある時だけ残してください。",
+                    details,
+                )
+            )
+            break
     return sorted(issues, key=lambda issue: (int(issue.context["line"]), str(issue.context["term"])))
 
 
@@ -682,6 +731,7 @@ def check_threads(path: Path, settings: Optional[Path]) -> Tuple[Dict[str, Any],
         context = {"post": post_number}
         visible_lines = visible_source_lines(post.source_lines)
         reviews.extend(verify_fact_review_issues(visible_lines, context))
+        reviews.extend(fuzzy_review_issues(visible_lines, context))
         if settings is not None:
             reviews.extend(voice_review_issues(visible_lines, voice_settings, context))
         violations.extend(repeated_ending_issues(post.text, context))
@@ -889,6 +939,7 @@ def check_note(
         )
     )
     reviews.extend(verify_fact_review_issues(source_lines, {}))
+    reviews.extend(fuzzy_review_issues(source_lines, {}))
     if settings is not None:
         # note の改行は Threads と違うことがあるため、設定の「note の改行」を使う。
         # 空の時は Threads の改行の癖を note に当てはめず、確かめるよう目視候補を1件だけ出す。
