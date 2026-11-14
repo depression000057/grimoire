@@ -1338,6 +1338,814 @@ def command_ingest_done(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- 市場の投稿（market-add・market-count・market-words） ---
+# 受講生がリサーチで集めた、伸びている他人の投稿を原文のまま手元に置き、言葉を数える。
+# 外には送らない。カード化の取り込み待ち（取り込み状況.json）にも入れない。
+
+MARKET_DIR_NAME = "50_市場の投稿"
+KANTEI_DIR_NAME = "鑑定"
+KANTEI_COLLECTED_NAME = "集めた投稿.md"
+MARKET_WORDS_FILE = "市場の言葉.md"
+MARKET_MIN_POSTS = 10  # これより少ないと、言葉の表と MARKET の確かめはしない
+MARKET_PHRASE_MIN_POSTS = 3  # よく出る言い回しとして数える下限（何本の投稿に出るか）
+MARKET_GRAM_MIN = 2
+MARKET_GRAM_MAX = 12
+MARKET_ENDING_MAX = 6
+MARKET_ENDING_TOP = 15
+MARKET_FILE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2,})\.md$")
+MARKET_HEADER_PREFIX = "<!-- tirnanog:market"
+MARKET_NUMBER_HEAD_RE = re.compile(r"^(?:#{1,6}\s*)?【\s*[0-9０-９]+\s*】")
+MARKET_SEPARATOR_LINE = "---"
+# ファイルの題などの見出し（「# 集めた投稿」）。投稿の文としては数えず、区切りとして扱う。「#金運」のような空白なしのタグは見出しではない
+MARKET_HEADING_RE = re.compile(r"^#{1,6}\s+\S")
+# 書き手の行: 行全体が @ で始まり、空白を含まない40字までの名前（@ふく江・2日 の「・」より後ろは捨てる）。
+# 行の途中の @ や、名前の後ろに文が続く行（@名前 ありがとう）は書き手にしない
+MARKET_AUTHOR_HANDLE_RE = re.compile(r"^@([^\s@・·|｜]{1,40})\s*(?:[・·|｜].*)?$")
+MARKET_AUTHOR_LABEL_RE = re.compile(r"^(?:書き手|投稿者)\s*[:：]\s*(.+)$")
+# いいね・コメントの数だけの行（案内で数字も一緒に貼ってもらうため）。言葉の数えに入れない
+MARKET_METRIC_LINE_RE = re.compile(
+    r"^(?:(?:いいね|コメント|リポスト|再投稿|引用|シェア|返信|閲覧|表示回数|保存)\s*[:：]?\s*"
+    r"[0-9][0-9.,万千kK]*\s*(?:件|回|人)?[\s・/|、,]*)+$"
+)
+MARKET_NUMBER_ONLY_RE = re.compile(r"^[0-9][0-9.,]*$")
+HTML_COMMENT_BLOCK_RE = re.compile(r"<!--.*?(?:-->|\Z)", re.DOTALL)
+MARKET_SENTENCE_SPLIT_RE = re.compile(r"[。！？!?\n]+")
+SMALL_KANA = set("ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ")
+# 並びの頭・お尻で見る助詞1字
+MARKET_PARTICLES = set("のはでにをがともへや")
+# 漢字の後ろに来ても、言葉の切れ目と見なすかな（助詞・助動詞の頭）
+MARKET_BREAK_KANA = set("のはでにをがともへやかよねなだじ")
+# 2字以上の漢字・カタカナの後ろの「し・す・さ・せ」は、する言葉（冷凍して）の切れ目と見なす
+MARKET_SURU_KANA = set("しすさせ")
+MARKET_COVER_RATIO = 0.8  # 長い並びが、短い並びの本数のこの割合以上を占めたら、短い並びは落とす
+MARKET_LONGEST_MIN = 4  # 0本の句に添える「一番長い並び」の下限の字数
+MARKET_COPY_MIN_CHARS = 12  # これ以上の長さの句が1〜2人の投稿にしか出ない時は「1人の文の写しに近い」（tn_check の MARKET_COPY と同じ）
+MARKET_COPY_MAX_PEOPLE = 2
+# よく出る言い回しから落とす、意味を持たない並び（助詞・助動詞のつながり）。大事な言葉を落とさないよう小さくしておく
+MARKET_STOP_GRAMS: Set[str] = {
+    "ている", "ていた", "ていて", "ています", "ていました", "てる", "てた",
+    "している", "していた", "しています", "して", "した", "する", "します", "しました",
+    "いる", "いた", "います", "いました", "ある", "あった", "あります", "ありました",
+    "なる", "なった", "なります", "ない", "なく", "なくて", "ません", "ませんでした",
+    "です", "でした", "ます", "ました", "ので", "から", "けど", "けれど", "って", "という", "といった",
+    "として", "について", "には", "では", "とは", "のは", "のが", "のを", "のに", "のも", "のです", "なんです",
+    "こと", "ことが", "ことを", "ことは", "もの", "ため", "よう", "ように", "それ", "これ", "あれ",
+    "その", "この", "あの", "それは", "これは", "たら", "れば", "まで", "より", "など", "だけ", "でも", "ても",
+    "にも", "との", "への", "でいる", "じゃない", "ではない", "かった", "なかった", "った",
+}
+
+
+@dataclass
+class MarketPost:
+    text: str  # 本文（書き手の行・数字だけの行を外した行。NFC にそろえた）
+    lines: List[str]
+    author: str
+    source: str
+    compact: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.compact:
+            self.compact = compact_text(self.text)
+
+    @property
+    def first_line(self) -> str:
+        return self.lines[0] if self.lines else ""
+
+
+def nfc(text: str) -> str:
+    return unicodedata.normalize("NFC", text)
+
+
+def compact_text(text: str) -> str:
+    """全角・半角の空白と改行を外し、NFC にそろえる（句を文字のまま比べるため）。"""
+    return "".join(character for character in nfc(text) if not character.isspace())
+
+
+def find_child(parent: Path, name: str) -> Optional[Path]:
+    """名前が NFC・NFD のどちらで保存されていても見つける。無ければ None。"""
+    direct = parent / name
+    if direct.exists():
+        return direct
+    if not parent.is_dir():
+        return None
+    wanted = nfc(name)
+    try:
+        for child in parent.iterdir():
+            if nfc(child.name) == wanted:
+                return child
+    except OSError:
+        return None
+    return None
+
+
+def require_knowledge_directory(root: Path) -> None:
+    if not root.is_dir():
+        raise InputError(f"マイナレッジのフォルダが見つかりません: {root}")
+
+
+def strip_market_header(text: str) -> str:
+    """保存した時の頭書き（HTML のコメント）を外す。行の数は変えない。"""
+    return HTML_COMMENT_BLOCK_RE.sub(lambda match: "\n" * match.group(0).count("\n"), text)
+
+
+def split_market_blocks(text: str) -> Tuple[List[List[str]], bool]:
+    """貼られた文を投稿ごとの行に分ける。区切りは `---` だけの行・【番号】で始まる行・空行2つ以上
+    （ほかに、ファイルの題などの「# 」で始まる見出しの行も、文として数えずに区切りにする）。
+
+    空行が1つだけの所では区切らない（投稿の中の段落）。【番号】の行は次の投稿の先頭で、番号を外して
+    残った文があれば、それを投稿の1行目にする。返り値は（投稿ごとの行の一覧, 区切りが1つでもあったか）。
+    """
+    blocks: List[List[str]] = []
+    current: List[str] = []
+    blank_run = 0
+    found_separator = False
+
+    def flush() -> None:
+        nonlocal current
+        while current and not current[-1].strip():
+            current.pop()
+        while current and not current[0].strip():
+            current.pop(0)
+        if current:
+            blocks.append(current)
+        current = []
+
+    for raw_line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        stripped = raw_line.strip()
+        if stripped == MARKET_SEPARATOR_LINE:
+            flush()
+            found_separator = True
+            blank_run = 0
+            continue
+        head = MARKET_NUMBER_HEAD_RE.match(stripped)
+        if head:
+            flush()
+            found_separator = True
+            blank_run = 0
+            rest = stripped[head.end() :].strip()
+            if rest:
+                current.append(rest)
+            continue
+        if MARKET_HEADING_RE.match(stripped):
+            flush()
+            found_separator = True
+            blank_run = 0
+            continue
+        if not stripped:
+            blank_run += 1
+            current.append("")
+            continue
+        if blank_run >= 2 and any(line.strip() for line in current):
+            flush()
+            found_separator = True
+        blank_run = 0
+        current.append(raw_line.rstrip())
+    flush()
+    return blocks, found_separator
+
+
+def market_post_from_block(block: Sequence[str], source: str) -> Optional[MarketPost]:
+    """投稿1本の行から、書き手の行（@名前・書き手:）と数字だけの行を外す。本文が残らなければ None。"""
+    author = ""
+    lines: List[str] = []
+    for raw_line in block:
+        line = nfc(raw_line).strip()
+        if not line:
+            if lines:
+                lines.append("")
+            continue
+        handle = MARKET_AUTHOR_HANDLE_RE.match(line)
+        label = MARKET_AUTHOR_LABEL_RE.match(line)
+        if handle is not None or label is not None:
+            if not author:
+                found = handle.group(1) if handle is not None else label.group(1)  # type: ignore[union-attr]
+                author = found.strip().lstrip("@")
+            continue
+        folded = unicodedata.normalize("NFKC", line)
+        if MARKET_METRIC_LINE_RE.match(folded) or MARKET_NUMBER_ONLY_RE.match(folded):
+            continue
+        lines.append(line)
+    while lines and not lines[-1]:
+        lines.pop()
+    if not lines:
+        return None
+    return MarketPost(text="\n".join(lines), lines=[line for line in lines if line], author=author, source=source)
+
+
+def market_files(root: Path) -> List[Path]:
+    folder = find_child(root, MARKET_DIR_NAME)
+    if folder is None or not folder.is_dir():
+        return []
+    files = [
+        path
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() == ".md" and not path.name.startswith((".", "_"))
+    ]
+    return sorted(files, key=lambda item: nfc(item.name))
+
+
+def kantei_collected_file(root: Path) -> Optional[Path]:
+    kantei = find_child(root, KANTEI_DIR_NAME)
+    if kantei is None or not kantei.is_dir():
+        return None
+    path = find_child(kantei, KANTEI_COLLECTED_NAME)
+    return path if path is not None and path.is_file() else None
+
+
+def is_market_text(text: str) -> bool:
+    """market-add で保存した形（頭に <!-- tirnanog:market … --> の行）か。"""
+    return text.lstrip("\ufeff \t\r\n").startswith(MARKET_HEADER_PREFIX)
+
+
+def market_posts_from_text(text: str, source: str) -> List[MarketPost]:
+    """ファイル1つ分の文を、頭書き・書き手の行・数だけの行を外して、投稿ごとに分ける。"""
+    blocks, _ = split_market_blocks(strip_market_header(text))
+    return [post for post in (market_post_from_block(block, source) for block in blocks) if post is not None]
+
+
+def load_market_posts(root: Path) -> Tuple[List[MarketPost], Dict[str, int]]:
+    """`50_市場の投稿/*.md` と `鑑定/集めた投稿.md` を読む（どちらも無ければ0本）。
+
+    空白を外した中身が同じ投稿は1本にまとめる（同じ投稿を2か所に置いても、本数がふくらまないように）。
+    """
+    require_knowledge_directory(root)
+    folder_paths = market_files(root)
+    sources: List[Tuple[Path, str]] = [(path, f"{MARKET_DIR_NAME}/{nfc(path.name)}") for path in folder_paths]
+    kantei = kantei_collected_file(root)
+    if kantei is not None:
+        sources.append((kantei, f"{KANTEI_DIR_NAME}/{KANTEI_COLLECTED_NAME}"))
+    posts: List[MarketPost] = []
+    seen: Set[str] = set()
+    counts = {"folder_posts": 0, "kantei_posts": 0, "duplicates": 0}
+    for path, label in sources:
+        for post in market_posts_from_text(read_source_text(path), label):
+            if post.compact in seen:
+                counts["duplicates"] += 1
+                continue
+            seen.add(post.compact)
+            posts.append(post)
+            counts["kantei_posts" if path == kantei else "folder_posts"] += 1
+    summary = {"total": len(posts), "folder_files": len(folder_paths), **counts}
+    return posts, summary
+
+
+def market_summary_text(summary: Dict[str, int]) -> str:
+    detail = [f"{MARKET_DIR_NAME} {summary['folder_posts']}本（{summary['folder_files']}ファイル）"]
+    if summary["kantei_posts"]:
+        detail.append(f"{KANTEI_DIR_NAME}/{KANTEI_COLLECTED_NAME} {summary['kantei_posts']}本")
+    text = f"集めた投稿: {summary['total']}本（{'・'.join(detail)}"
+    if summary["duplicates"]:
+        text += f"。同じ投稿 {summary['duplicates']}本は1本として数えました"
+    return text + "）"
+
+
+def phrase_hits(posts: Sequence[MarketPost], needle: str) -> Dict[str, object]:
+    hits = [post for post in posts if needle in post.compact]
+    authors = {post.author for post in hits if post.author}
+    return {
+        "posts": len(hits),
+        "authors": len(authors) if authors else None,
+        "authors_unknown_posts": sum(1 for post in hits if not post.author),
+        "hits": hits,
+    }
+
+
+def longest_found_part(posts: Sequence[MarketPost], needle: str) -> Optional[Dict[str, object]]:
+    """句の中で、集めた投稿に出る一番長い並び（4字以上）。同じ長さなら本数の多い物。無ければ None。"""
+    for size in range(len(needle) - 1, MARKET_LONGEST_MIN - 1, -1):
+        best: Optional[Dict[str, object]] = None
+        for start in range(0, len(needle) - size + 1):
+            part = needle[start : start + size]
+            found = phrase_hits(posts, part)
+            if found["posts"] and (best is None or int(found["posts"]) > int(best["posts"])):  # type: ignore[arg-type]
+                best = {"phrase": part, **found}
+        if best is not None:
+            # 端の句読点・かっこは外して数え直す（「母から教わった、」→「母から教わった」）
+            trimmed = str(best["phrase"])
+            while trimmed and unicodedata.category(trimmed[0])[0] in ("P", "S", "Z"):
+                trimmed = trimmed[1:]
+            while trimmed and unicodedata.category(trimmed[-1])[0] in ("P", "S", "Z"):
+                trimmed = trimmed[:-1]
+            if trimmed != best["phrase"] and len(trimmed) >= MARKET_LONGEST_MIN:
+                best = {"phrase": trimmed, **phrase_hits(posts, trimmed)}
+            best.pop("hits")
+            return best
+    return None
+
+
+def count_phrase(posts: Sequence[MarketPost], phrase: str) -> Dict[str, object]:
+    """句を文字のまま探す（空白・改行は無視）。出る投稿の本数・書き手の人数・例を1つ返す。
+
+    0本の時は、句の中で集めた投稿に出る一番長い並び（4字以上）を longest に入れる（市場の形＋中身の句を見分けるため）。
+    """
+    needle = compact_text(phrase)
+    if not needle:
+        raise InputError("--phrase が空です（空白だけの句は数えられません）。")
+    found = phrase_hits(posts, needle)
+    hits: List[MarketPost] = found.pop("hits")  # type: ignore[assignment]
+    example = ""
+    if hits:
+        post = hits[0]
+        example = next((line for line in post.lines if needle in compact_text(line)), "")
+        if not example:
+            # 句が改行をまたいで出る時は「その句を含む1行」が無いので、またいだ所の前後を空白なしでつないで例にする
+            position = post.compact.find(needle)
+            example = post.compact[max(0, position - 10) : position + len(needle) + 10]
+    return {
+        "phrase": phrase,
+        **found,
+        "example": example,
+        "longest": None if hits else longest_found_part(posts, needle),
+    }
+
+
+def authors_text(count: Optional[int], unknown: int) -> str:
+    if count is None:
+        return "人数は不明"
+    if unknown:
+        return f"{count}人以上（書き手が分からない投稿 {unknown}本）"
+    return f"{count}人"
+
+
+def next_market_path(folder: Path, today: date) -> Path:
+    prefix = today.isoformat()
+    highest = 0
+    if folder.is_dir():
+        for path in folder.iterdir():
+            match = MARKET_FILE_RE.match(nfc(path.name))
+            if match and match.group(1) == prefix:
+                highest = max(highest, int(match.group(2)))
+    return folder / f"{prefix}_{highest + 1:02d}.md"
+
+
+def read_market_input(args: argparse.Namespace) -> Tuple[str, str]:
+    if args.prompt_json is not None:
+        if not args.prompt_json.is_file():
+            raise InputError(f"ファイルが見つかりません: {args.prompt_json}")
+        return read_prompt_json(args.prompt_json), "チャットに貼られた文"
+    path: Path = args.file if args.file is not None else args.text_file
+    if str(path) == "-":
+        # 一時ファイルを作らずに、標準入力（heredoc など）から受け取る
+        data = sys.stdin.buffer.read()
+        for encoding in ("utf-8-sig", "cp932"):
+            try:
+                return data.decode(encoding), "標準入力"
+            except UnicodeDecodeError:
+                continue
+        raise InputError("標準入力を文字として読めません（UTF-8 にしてください）。")
+    if not path.is_file():
+        raise InputError(f"ファイルが見つかりません: {path}")
+    return read_source_text(path), path.name
+
+
+def header_value(text: str) -> str:
+    # 頭書きのコメントが途中で閉じないよう、改行をつなぎ「--」を全角にする
+    return " ".join(text.split()).replace("--", "－－")
+
+
+def command_market_add(args: argparse.Namespace) -> int:
+    root: Path = args.directory
+    cards = find_child(root, "カード")
+    if cards is None or not cards.is_dir():
+        raise InputError(f"マイナレッジが見つかりません（先に init）: {root}")
+    raw_text, origin = read_market_input(args)
+    text = raw_text.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+    if not text.strip():
+        raise InputError("貼られた文が空です。")
+    blocks, found_separator = split_market_blocks(strip_market_header(text))
+    saved_posts = [post for post in (market_post_from_block(block, "") for block in blocks) if post is not None]
+    if not saved_posts:
+        raise InputError("投稿の本文が見つかりません（書き手の行や数字だけでした）。")
+
+    folder = find_child(root, MARKET_DIR_NAME) or (root / MARKET_DIR_NAME)
+    digest = hashlib.sha256(compact_text(strip_market_header(text)).encode("utf-8")).hexdigest()
+    for existing in market_files(root):
+        body = strip_market_header(read_source_text(existing))
+        if hashlib.sha256(compact_text(body).encode("utf-8")).hexdigest() == digest:
+            print(f"同じ中身がすでに保存されているので、保存しませんでした: {existing}")
+            _, summary = load_market_posts(root)
+            print(market_summary_text(summary))
+            return 0
+
+    today = date.today()
+    destination = next_market_path(folder, today)
+    header = f"{MARKET_HEADER_PREFIX} date: {today.isoformat()} from: {header_value(origin)}"
+    note = header_value(args.note or "")
+    if note:
+        header += f" note: {note}"
+    header += " -->\n\n"
+    atomic_write_text(destination, header + text + "\n")
+
+    _, summary = load_market_posts(root)
+    print(f"市場の投稿を保存しました: {destination}（{len(saved_posts)}本）")
+    if not found_separator:
+        print("区切り（--- だけの行・【番号】で始まる行・空行2つ以上）が見つからなかったので、全体を1本の投稿として保存しました。")
+    print(market_summary_text(summary))
+    if summary["total"] < MARKET_MIN_POSTS:
+        print(f"あと {MARKET_MIN_POSTS - summary['total']} 本集めると、市場の言葉を数えて確かめられます（10本から）。")
+    else:
+        print("`market-words` で市場の言葉の表を作り直せます。")
+    return 0
+
+
+def zero_phrase_text(item: Dict[str, object]) -> str:
+    """0本の句の後ろに付ける（ ）の中身。"""
+    longest = item.get("longest")
+    if not longest:
+        return "4字以上の並びも0本"
+    who = authors_text(longest["authors"], int(longest["authors_unknown_posts"]))  # type: ignore[index,arg-type]
+    return f"この中で集めた投稿にある一番長い並び: 「{longest['phrase']}」{longest['posts']}本・{who}"  # type: ignore[index]
+
+
+def command_market_count(args: argparse.Namespace) -> int:
+    posts, summary = load_market_posts(args.directory)
+    results = [count_phrase(posts, phrase) for phrase in args.phrases]
+    if args.json:
+        payload = {"total_posts": summary["total"], "sources": summary, "phrases": results}
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print(market_summary_text(summary))
+    if summary["total"] < MARKET_MIN_POSTS:
+        print(f"集めた投稿が {summary['total']} 本なので、本数は目安です（10本から確かめられます）。")
+    for item in results:
+        if item["posts"] == 0:
+            print(f"- 「{item['phrase']}」: 0本（{zero_phrase_text(item)}）")
+            continue
+        who = authors_text(item["authors"], int(item["authors_unknown_posts"]))  # type: ignore[arg-type]
+        print(f"- 「{item['phrase']}」: {item['posts']}本・{who}（例: {item['example']}）")
+    return 0
+
+
+def market_segments(text: str) -> List[str]:
+    """文字（かな・漢字・英字）と数字の続きだけを取り出す。空白・句読点・かっこ・絵文字で切る。"""
+    segments: List[str] = []
+    current: List[str] = []
+    for character in text:
+        category = unicodedata.category(character)
+        if category[0] in ("L", "N") or category == "Mn":
+            current.append(character)
+            continue
+        if current:
+            segments.append("".join(current))
+            current = []
+    if current:
+        segments.append("".join(current))
+    return segments
+
+
+def is_hiragana(character: str) -> bool:
+    return "\u3041" <= character <= "\u309f"
+
+
+def character_kind(character: str) -> str:
+    if "\u3041" <= character <= "\u309f":
+        return "hiragana"
+    if "\u30a1" <= character <= "\u30ff" or character == "ー":
+        return "katakana"
+    if unicodedata.category(character) == "Nd":
+        return "digit"
+    if unicodedata.category(character).startswith("L") and unicodedata.name(character, "").startswith("CJK"):
+        return "kanji"
+    if character.isascii() and character.isalpha():
+        return "latin"
+    return "other"
+
+
+def ends_inside_word(gram: str, following: str) -> bool:
+    """並びのお尻が、言葉の途中で切れているか（「冷凍し|て」「3パターンで回|して」「考え|る」）。"""
+    if not following:
+        return False
+    last = gram[-1]
+    last_kind = character_kind(last)
+    next_kind = character_kind(following)
+    if last_kind in ("kanji", "katakana", "digit", "latin") and next_kind == last_kind:
+        return True  # 漢字・カタカナ・数字・英字の続きの途中
+    if next_kind != "hiragana":
+        return False
+    if last_kind == "hiragana":
+        return True  # かなの続きの途中（送り仮名・活用の途中）
+    if following in MARKET_BREAK_KANA:
+        return False
+    if last_kind in ("kanji", "katakana"):
+        run = 0
+        for character in reversed(gram):
+            if character_kind(character) != last_kind:
+                break
+            run += 1
+        if (run >= 2 or last_kind == "katakana") and following in MARKET_SURU_KANA:
+            return False  # 「冷凍して」「コメントして」の、する言葉の切れ目
+        return True  # 漢字1字の後ろの送り仮名（回して・考える）
+    return False
+
+
+def starts_inside_word(gram: str, preceding: str) -> bool:
+    """並びの頭が、言葉の途中から始まっているか（「月|曜の朝」「とだ|けコメント」）。"""
+    if not preceding:
+        return False
+    kind = character_kind(gram[0])
+    if kind in ("kanji", "katakana", "digit", "latin") and character_kind(preceding) == kind:
+        return True
+    if kind != "hiragana" or gram[0] in MARKET_PARTICLES:
+        return False
+    # かなの続きの途中（前のかなが助詞でない時）か、漢字の後ろの送り仮名から始まる（「早|い人」）
+    preceding_kind = character_kind(preceding)
+    return (preceding_kind == "hiragana" and preceding not in MARKET_PARTICLES) or preceding_kind == "kanji"
+
+
+def is_noise_gram(gram: str, ending_words: Sequence[str] = ()) -> bool:
+    if gram in MARKET_STOP_GRAMS:
+        return True
+    if gram[0] in SMALL_KANA or gram[0] in "ーん":
+        return True  # 言葉の途中から始まる並び
+    if all(unicodedata.category(character) == "Nd" for character in gram):
+        return True  # 数字だけ
+    hiragana_only = all(is_hiragana(character) for character in gram)
+    if hiragana_only and len(gram) < 4:
+        return True  # 漢字・カタカナを含まない並びは4字以上だけ残す
+    if gram[0] == "を" or (gram[0] in MARKET_PARTICLES and len(gram) > 1 and not is_hiragana(gram[1])):
+        return True  # 助詞1字で始まる並び（「の3」「と魚に下味を付けて」）
+    if len(gram) == 2 and gram[-1] in MARKET_PARTICLES:
+        return True  # 助詞1字で終わる2字の並び（「曜の」「人は」「分で」）
+    if hiragana_only and any(gram in ending or ending in gram for ending in ending_words):
+        return True  # 文末の形の表に出る物と、その一部だけの並び（「てください」「ださい」）
+    return False
+
+
+def frequent_grams(posts: Sequence[MarketPost], ending_words: Sequence[str] = ()) -> List[Tuple[str, Set[int]]]:
+    """3本以上の投稿に出る 2〜12字の並びから、意味の無い並びを落とした物。
+
+    落とす物: 落とす語の一覧・助詞1字で始まる並びと助詞1字で終わる2字の並び・ひらがなだけの3字以下・
+    文末の形の表に出る物・上限の12字で切れた並び・言葉の途中で始まる／終わる並び（出る所の半分を超える時）・
+    長い並びに含まれる短い並び（長い方が、短い方の本数の8割以上に出る時）。
+    """
+    occurrences: Dict[str, Set[int]] = {}
+    post_segments = [market_segments(post.text) for post in posts]
+    for index, segments in enumerate(post_segments):
+        grams: Set[str] = set()
+        for segment in segments:
+            length = len(segment)
+            for size in range(MARKET_GRAM_MIN, min(MARKET_GRAM_MAX, length) + 1):
+                for start in range(0, length - size + 1):
+                    grams.add(segment[start : start + size])
+        for gram in grams:
+            occurrences.setdefault(gram, set()).add(index)
+    frequent = {gram: ids for gram, ids in occurrences.items() if len(ids) >= MARKET_PHRASE_MIN_POSTS}
+
+    # 出る所ごとに、言葉の途中で切れているかを数える（3本以上に出る並びだけ）
+    seen_count: Dict[str, int] = {}
+    inside_count: Dict[str, int] = {}
+    whole_segments: Set[str] = set()
+    for segments in post_segments:
+        for segment in segments:
+            whole_segments.add(segment)
+            length = len(segment)
+            for size in range(MARKET_GRAM_MIN, min(MARKET_GRAM_MAX, length) + 1):
+                for start in range(0, length - size + 1):
+                    gram = segment[start : start + size]
+                    if gram not in frequent:
+                        continue
+                    preceding = segment[start - 1] if start > 0 else ""
+                    following = segment[start + size] if start + size < length else ""
+                    seen_count[gram] = seen_count.get(gram, 0) + 1
+                    if ends_inside_word(gram, following) or starts_inside_word(gram, preceding):
+                        inside_count[gram] = inside_count.get(gram, 0) + 1
+
+    valid: Dict[str, Set[int]] = {}
+    for gram, ids in frequent.items():
+        if is_noise_gram(gram, ending_words):
+            continue
+        if len(gram) >= MARKET_GRAM_MAX and gram not in whole_segments:
+            continue  # 上限の12字で切れた並び
+        if inside_count.get(gram, 0) * 2 > seen_count.get(gram, 1):
+            continue  # 言葉の途中で始まる・終わる所が半分を超える
+        valid[gram] = ids
+
+    # 1語に助詞が1字付いただけの並び（「献立は」「台所に」）は、1語の方があれば落とす。
+    # 先に落とすのは、助詞の付いた方が1語の方を覆って消さないようにするため。
+    # 中に助詞がある並び（「月曜の朝15分で」）は1語ではないので、助詞の付いた形のまま残す
+    valid = {
+        gram: ids
+        for gram, ids in valid.items()
+        if not (
+            len(gram) > 2
+            and gram[-1] in MARKET_PARTICLES
+            and gram[:-1] in valid
+            and not any(character in MARKET_PARTICLES for character in gram[:-1])
+        )
+    }
+    # 長い並びに含まれる短い並びは、長い方が短い方の本数の8割以上に出る時に落とす
+    cover: Dict[str, int] = {}
+    for longer, ids in valid.items():
+        for size in range(MARKET_GRAM_MIN, len(longer)):
+            for start in range(0, len(longer) - size + 1):
+                part = longer[start : start + size]
+                if part in valid and len(ids) > cover.get(part, 0):
+                    cover[part] = len(ids)
+    kept = [
+        (gram, ids)
+        for gram, ids in valid.items()
+        if cover.get(gram, 0) < MARKET_COVER_RATIO * len(ids)
+    ]
+    kept.sort(key=lambda item: (-len(item[1]), -len(item[0]), item[0]))
+    return kept
+
+
+def people_count(posts: Sequence[MarketPost], ids: Iterable[int]) -> int:
+    """書き手の人数。書き手が分からない投稿は1本を1人と数える（多めに見積もる）。"""
+    chosen = [posts[index] for index in ids]
+    return len({post.author for post in chosen if post.author}) + sum(1 for post in chosen if not post.author)
+
+
+def is_copy_like(posts: Sequence[MarketPost], ids: Iterable[int], phrase: str) -> bool:
+    return len(compact_text(phrase)) >= MARKET_COPY_MIN_CHARS and people_count(posts, ids) <= MARKET_COPY_MAX_PEOPLE
+
+
+def edge_trimmed(text: str) -> str:
+    characters = list(text.strip())
+    while characters and unicodedata.category(characters[0])[0] in ("P", "S", "Z"):
+        characters.pop(0)
+    while characters and unicodedata.category(characters[-1])[0] in ("P", "S", "Z"):
+        characters.pop()
+    return "".join(characters)
+
+
+def select_grams(
+    grams: Sequence[Tuple[str, Set[int]]], top: int, posts: Sequence[MarketPost]
+) -> List[Tuple[str, Set[int], List[str]]]:
+    """上位の言い回しを選ぶ。同じ投稿の組の、同じ文（。！？で切った所）から出る並び（1つの決まり文句の切れ端）は
+    1行にまとめ、その文の中で切れ端を全部覆う所を、原文のまま見せる（「献立は、焼く・煮る・炒めるの3パターンで回してください」）。
+
+    返り値は（見せる言い回し, 出る投稿, まとめた並び）の一覧。
+    """
+    groups: List[Dict[str, object]] = []
+    for gram, ids in grams:
+        line = next(
+            (sentence for sentence in MARKET_SENTENCE_SPLIT_RE.split(example_line(posts, ids, gram)) if gram in sentence),
+            "",
+        )
+        group = next((item for item in groups if item["ids"] == ids and item["line"] == line), None)
+        if group is not None:
+            group["members"].append(gram)  # type: ignore[union-attr]
+            continue
+        groups.append({"ids": ids, "line": line, "members": [gram]})
+    selected: List[Tuple[str, Set[int], List[str]]] = []
+    for group in groups:
+        if len(selected) >= top:
+            break
+        members: List[str] = group["members"]  # type: ignore[assignment]
+        line = str(group["line"])
+        display = members[0]
+        if len(members) > 1 and line:
+            positions = [(line.find(member), line.find(member) + len(member)) for member in members if member in line]
+            if positions:
+                display = edge_trimmed(line[min(start for start, _ in positions) : max(end for _, end in positions)])
+        if is_copy_like(posts, group["ids"], display):  # type: ignore[arg-type]
+            continue  # 1人の文の写しに近い長い行は、表に載せない（tn_check の MARKET_COPY に止められるため）
+        selected.append((display, group["ids"], members))  # type: ignore[arg-type]
+    return selected
+
+
+def sentence_ending(sentence: str) -> str:
+    """文の終わりのかな（〜してください・〜です など）。漢字・カタカナで終わる時は空を返す。"""
+    characters = list(sentence.rstrip())
+    while characters and unicodedata.category(characters[-1])[0] not in ("L", "N"):
+        characters.pop()
+    tail: List[str] = []
+    while characters and ("ぁ" <= characters[-1] <= "ゟ" or characters[-1] == "ー"):
+        tail.insert(0, characters.pop())
+    return "".join(tail)
+
+
+def frequent_endings(posts: Sequence[MarketPost]) -> Tuple[List[Tuple[str, Set[int], str]], Set[int]]:
+    """文末のかな（2〜6字）が何本の投稿に出るか。同じ本数の長い終わり方に含まれる短い物は落とす。"""
+    occurrences: Dict[str, Set[int]] = {}
+    examples: Dict[str, str] = {}
+    noun_endings: Set[int] = set()
+    for index, post in enumerate(posts):
+        for sentence in MARKET_SENTENCE_SPLIT_RE.split(post.text):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            tail = sentence_ending(sentence)
+            if not tail:
+                if any(unicodedata.category(character)[0] in ("L", "N") for character in sentence):
+                    noun_endings.add(index)
+                continue
+            for size in range(2, min(MARKET_ENDING_MAX, len(tail)) + 1):
+                ending = tail[-size:]
+                occurrences.setdefault(ending, set()).add(index)
+                examples.setdefault(ending, sentence)
+    counts = {ending: len(ids) for ending, ids in occurrences.items()}
+    covered = {
+        longer[1:]
+        for longer, count in counts.items()
+        if len(longer) > 2 and counts.get(longer[1:]) == count
+    }
+    # 1字短い終わり方の半分に届かない長い物（「〜べてください」など、動詞の送り仮名まで入った物）は落とす
+    thin = {
+        ending
+        for ending, count in counts.items()
+        if len(ending) > 2 and count * 2 < counts.get(ending[1:], 0)
+    }
+    kept = [
+        (ending, ids, examples[ending])
+        for ending, ids in occurrences.items()
+        if len(ids) >= 2 and ending not in covered and ending not in thin
+    ]
+    kept.sort(key=lambda item: (-len(item[1]), -len(item[0]), item[0]))
+    return kept[:MARKET_ENDING_TOP], noun_endings
+
+
+def ids_authors_text(posts: Sequence[MarketPost], ids: Iterable[int]) -> str:
+    chosen = [posts[index] for index in ids]
+    authors = {post.author for post in chosen if post.author}
+    unknown = sum(1 for post in chosen if not post.author)
+    if not authors:
+        return "不明"
+    return f"{len(authors)}人" + (f"＋不明{unknown}本" if unknown else "")
+
+
+def example_line(posts: Sequence[MarketPost], ids: Set[int], gram: str) -> str:
+    for index in sorted(ids):
+        for line in posts[index].lines:
+            if gram in line:
+                return line
+    return ""
+
+
+def build_market_words_text(posts: Sequence[MarketPost], summary: Dict[str, int], top: int) -> Tuple[str, int]:
+    endings, noun_endings = frequent_endings(posts)
+    grams = select_grams(frequent_grams(posts, [ending for ending, _, _ in endings]), top, posts)
+    lines = [
+        "# 市場の言葉",
+        "",
+        f"- 作った日: {date.today().isoformat()}",
+        f"- {market_summary_text(summary)}",
+        "- この表は道具が数えた物。手で言葉を足さない（集めた投稿が増えたら `market-words` で作り直す）",
+        "",
+        f"## よく出る言い回し（{MARKET_PHRASE_MIN_POSTS}本以上の投稿に出る {MARKET_GRAM_MIN}〜{MARKET_GRAM_MAX}字の並び・上位{top}）",
+        "",
+        "同じ投稿の同じ文から出る並び（1つの決まり文句の切れ端）は、その文の原文のまま1行にまとめています。",
+        "",
+    ]
+    if grams:
+        lines.extend(["| 言い回し | 本数 | 書き手 | 例（その並びを含む1行） |", "|---|---:|---|---|"])
+        for display, ids, members in grams:
+            lines.append(
+                f"| {table_cell(display)} | {len(ids)} | {ids_authors_text(posts, ids)} | "
+                f"{table_cell(example_line(posts, ids, members[0]))} |"
+            )
+    else:
+        lines.append(f"{MARKET_PHRASE_MIN_POSTS}本以上の投稿に出る言い回しは、まだありません。")
+
+    first_lines: Dict[str, List[int]] = {}
+    for index, post in enumerate(posts):
+        first_lines.setdefault(compact_text(post.first_line), []).append(index)
+
+    def first_line_key(item: Tuple[str, List[int]]) -> Tuple[int, int, int]:
+        key, ids = item
+        best = max((len(gram_ids) for _, gram_ids, members in grams if any(member in key for member in members)), default=0)
+        return (-len(ids), -best, ids[0])
+
+    lines.extend(
+        [
+            "",
+            "## 1行目の一覧（原文のまま）",
+            "",
+            "同じ1行目の本数が多い順、次に、本数の多い言い回しが入っている順に並べています。",
+            "",
+            "| 1行目（原文） | 同じ1行目の本数 | 入っているよく出る言い回し |",
+            "|---|---:|---|",
+        ]
+    )
+    for key, ids in sorted(first_lines.items(), key=first_line_key):
+        contained = " ／ ".join(display for display, _, members in grams if any(member in key for member in members))
+        lines.append(f"| {table_cell(posts[ids[0]].first_line)} | {len(ids)} | {table_cell(contained)} |")
+
+    lines.extend(["", "## 文末の形（上位）", "", "| 終わり方 | 本数 | 例 |", "|---|---:|---|"])
+    for ending, ids, example in endings:
+        lines.append(f"| 〜{table_cell(ending)} | {len(ids)} | {table_cell(example)} |")
+    if len(noun_endings) >= 2:
+        lines.append(f"| （漢字・カタカナの言葉で終わる） | {len(noun_endings)} | |")
+    return "\n".join(lines).rstrip() + "\n", len(grams)
+
+
+def command_market_words(args: argparse.Namespace) -> int:
+    root: Path = args.directory
+    if args.top < 1:
+        raise InputError("--top は1以上で指定してください。")
+    posts, summary = load_market_posts(root)
+    if summary["total"] < MARKET_MIN_POSTS:
+        # 表は作らず、前に作った表も書き換えない
+        print(f"集めた投稿が {summary['total']} 本なので、表はまだ作れません（10本から）。")
+        return 0
+    text, gram_count = build_market_words_text(posts, summary, args.top)
+    output = args.out if args.out is not None else (find_child(root, MARKET_WORDS_FILE) or root / MARKET_WORDS_FILE)
+    atomic_write_text(output, text)
+    print(f"市場の言葉の表を書きました: {output}（集めた投稿 {summary['total']}本・よく出る言い回し {gram_count}個）")
+    return 0
+
+
 def add_directory_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("directory", type=Path, metavar="DIR", help="マイナレッジのフォルダ")
 
@@ -1469,6 +2277,33 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_done_parser.add_argument("--cards", help="この区切りから作った・強化したカードの id（カンマ区切り。無ければ省略）")
     ingest_done_parser.add_argument("--note", help="メモ（例: 雑談だけでカード無し）")
     ingest_done_parser.set_defaults(handler=command_ingest_done)
+
+    market_add_parser = subparsers.add_parser(
+        "market-add", help="集めた他人の投稿を、原文のまま 50_市場の投稿 に保存する（カードにはしない）"
+    )
+    add_directory_argument(market_add_parser)
+    market_input = market_add_parser.add_mutually_exclusive_group(required=True)
+    market_input.add_argument("--file", type=Path, help="貼られた投稿の入った UTF-8 ファイル")
+    market_input.add_argument(
+        "--prompt-json",
+        type=Path,
+        help="チャットに貼られた長い文を、フックが保存した JSON（_受け取り/*.json）から読む",
+    )
+    market_input.add_argument("--text-file", type=Path, help="投稿の入ったファイル（- なら標準入力から読む）")
+    market_add_parser.add_argument("--note", help="一言メモ（例: 金運で検索・コメントが多い順）")
+    market_add_parser.set_defaults(handler=command_market_add)
+
+    market_count_parser = subparsers.add_parser("market-count", help="句が、集めた投稿の何本に出るかを数える")
+    add_directory_argument(market_count_parser)
+    market_count_parser.add_argument("--phrase", dest="phrases", action="append", required=True, help="数える句（複数可）")
+    market_count_parser.add_argument("--json", action="store_true", help="JSON で表示する")
+    market_count_parser.set_defaults(handler=command_market_count)
+
+    market_words_parser = subparsers.add_parser("market-words", help="集めた投稿から、市場の言葉の表（市場の言葉.md）を作る")
+    add_directory_argument(market_words_parser)
+    market_words_parser.add_argument("--top", type=int, default=40, help="よく出る言い回しの表示件数（既定: 40）")
+    market_words_parser.add_argument("--out", type=Path, help="出力ファイル（省略時はマイナレッジの 市場の言葉.md）")
+    market_words_parser.set_defaults(handler=command_market_words)
     return parser
 
 

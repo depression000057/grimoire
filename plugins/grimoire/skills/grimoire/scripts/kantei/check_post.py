@@ -22,6 +22,7 @@ import difflib
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 READY_MIN = 80
@@ -220,10 +221,49 @@ def print_report(results):
     print(f"\n合格 {ok} / {len(results)} 本（合格の条件: 合計{READY_MIN}点以上・冒頭スコア{HOOK_MIN}点以上・安全ルールの言葉0件・重複0.72未満）")
 
 
+def load_market_module():
+    """1つ上のフォルダの tn_kb.py を読む（市場の投稿の区切り方を同じにするため）。__pycache__ は作らない。"""
+    sys.dont_write_bytecode = True
+    directory = str(Path(__file__).resolve().parent.parent)
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    import tn_kb  # noqa: E402
+
+    return tn_kb
+
+
+def read_past_file(path: Path, market: bool = False):
+    """比べる投稿のファイルを本文の一覧にする。
+
+    market-add で保存した形（頭に <!-- tirnanog:market … --> の行）は、tn_kb.py と同じ区切り方で
+    投稿ごとに分け、頭書き・書き手の行・数だけの行を外す。それ以外は今までどおり【番号】で区切る。
+    """
+    text = path.read_text(encoding="utf-8")
+    if market or text.lstrip("\ufeff \t\r\n").startswith("<!-- tirnanog:market"):
+        tn_kb = load_market_module()
+        return [post.text for post in tn_kb.market_posts_from_text(text, path.name)]
+    return [b for _, b, _ in split_posts(text)]
+
+
+def read_past(path: Path):
+    """--past がフォルダなら、中の .md を全部読む。
+
+    フォルダが 50_市場の投稿 なら、頭書きの無いファイル（手で置いた物）も、market-count と同じ市場の投稿の区切り方で読む。
+    """
+    if path.is_dir():
+        market = unicodedata.normalize("NFC", path.name) == "50_市場の投稿"
+        bodies = []
+        for child in sorted(path.iterdir(), key=lambda item: item.name):
+            if child.is_file() and child.suffix.lower() == ".md" and not child.name.startswith((".", "_")):
+                bodies += read_past_file(child, market)
+        return bodies
+    return read_past_file(path)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Threads 投稿の点検と採点の集計")
     ap.add_argument("posts", help="投稿ファイル（【1】【2】…で区切る）")
-    ap.add_argument("--past", action="append", default=[], help="過去の投稿ファイル（重複の確認用・何個でも）")
+    ap.add_argument("--past", action="append", default=[], help="過去の投稿ファイルか、50_市場の投稿 のフォルダ（重複の確認用・何個でも）")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
     path = Path(args.posts)
@@ -240,7 +280,7 @@ def main(argv=None) -> int:
         if not pp.exists():
             print(f"エラー: 比べる投稿のファイルが見つかりません: {pp}（無いなら --past から外してください）", file=sys.stderr)
             return 2
-        past += [b for _, b, _ in split_posts(pp.read_text(encoding="utf-8"))]
+        past += read_past(pp)
     results = check(posts, past)
     if args.json:
         print(json.dumps(results, ensure_ascii=False, indent=2))

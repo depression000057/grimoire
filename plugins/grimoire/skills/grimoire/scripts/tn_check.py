@@ -982,6 +982,131 @@ def check_note(
     return result, 1 if violations else 0
 
 
+# --- 市場の言葉の確かめ（--market） ---
+# 1行目（note は題と見出し）を句読点で分け、4字以上の句が、受講生が集めた伸びた投稿に1本も出ない時に目視候補にする。
+# 集めた投稿の読み方は tn_kb.py の market-count と同じ関数を使う（本数がずれないように）。
+
+MARKET_PHRASE_SPLIT_RE = re.compile(r"[、。！？!?\n]+")
+MARKET_PHRASE_MIN_CHARS = 4
+MARKET_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def load_market_module() -> Any:
+    """同じフォルダの tn_kb.py を読む。受講生のフォルダに __pycache__ を作らない。"""
+    sys.dont_write_bytecode = True
+    directory = str(Path(__file__).resolve().parent)
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
+    import tn_kb  # noqa: E402
+
+    return tn_kb
+
+
+def market_phrases(line: str) -> List[str]:
+    phrases: List[str] = []
+    for piece in MARKET_PHRASE_SPLIT_RE.split(line):
+        characters = list(piece.strip())
+        # 句の前後のかっこ・記号・絵文字は外して数える
+        while characters and unicodedata.category(characters[0])[0] in ("P", "S", "Z"):
+            characters.pop(0)
+        while characters and unicodedata.category(characters[-1])[0] in ("P", "S", "Z"):
+            characters.pop()
+        phrase = "".join(characters).strip()
+        if len("".join(phrase.split())) >= MARKET_PHRASE_MIN_CHARS:
+            phrases.append(phrase)
+    return phrases
+
+
+def market_targets(command: str, path: Path) -> List[Tuple[Dict[str, Any], str, str]]:
+    """（場所の情報, 場所の言い方, 調べる行）の一覧。Threads は各投稿の1行目、note は題と見出し。"""
+    targets: List[Tuple[Dict[str, Any], str, str]] = []
+    text = read_text(path)
+    if command == "threads":
+        for post_number, post in enumerate(split_thread_posts(text), start=1):
+            visible = visible_source_lines(post.parts[0].source_lines)
+            first = next(((number, line.strip()) for number, line in visible if line.strip()), None)
+            if first is not None:
+                targets.append(
+                    ({"post": post_number, "line": first[0]}, f"投稿{post_number}の1行目（{first[0]}行目）", first[1])
+                )
+        return targets
+    for line_number, line in enumerate(remove_html_comments(text).splitlines(), start=1):
+        match = MARKET_HEADING_RE.match(line.strip())
+        if match and match.group(2).strip():
+            label = "題" if len(match.group(1)) == 1 else "見出し"
+            targets.append(({"line": line_number, "heading_level": len(match.group(1))}, f"{line_number}行目の{label}", match.group(2).strip()))
+    return targets
+
+
+def people_text(tn_kb: Any, counted: Dict[str, Any]) -> str:
+    return tn_kb.authors_text(counted["authors"], int(counted["authors_unknown_posts"]))
+
+
+def market_review(command: str, path: Path, directory: Path) -> Tuple[List[Issue], Dict[str, Any]]:
+    tn_kb = load_market_module()
+    try:
+        posts, summary = tn_kb.load_market_posts(directory)
+    except tn_kb.InputError as exc:
+        raise InputError(str(exc)) from exc
+    total = int(summary["total"])
+    info: Dict[str, Any] = {"directory": str(directory), "posts": total, "checked": False}
+    if total < tn_kb.MARKET_MIN_POSTS:
+        info["message"] = f"集めた投稿が {total} 本（10本から確かめられます）"
+        return [], info
+    issues: List[Issue] = []
+    phrase_count = 0
+    zero_count = 0
+    copy_count = 0
+    for location, label, line in market_targets(command, path):
+        for phrase in market_phrases(line):
+            phrase_count += 1
+            counted = tn_kb.count_phrase(posts, phrase)
+            details = dict(location)
+            details.update({"phrase": phrase, "count": counted["posts"], "market_posts": total})
+            if not counted["posts"]:
+                zero_count += 1
+                longest = counted["longest"]
+                details.update({"kind": "market", "longest": longest})
+                if longest:
+                    guide = (
+                        f"この中で集めた投稿にある一番長い並びは「{longest['phrase']}」"
+                        f"（{longest['posts']}本・{people_text(tn_kb, longest)}）です。"
+                        f"その並びが市場の言い回しで、残りが題材・本人の言葉なら「形 {longest['posts']}本＋中身」と記録して残し、"
+                        "そうでなければ市場にある言い方の形に直してください（market-words.md §7・pipeline.md 段6d）。"
+                    )
+                else:
+                    guide = (
+                        "4字以上の並びも0本です。市場にある言い方の形に直すか、本人の言葉・題材なら理由を1行残してください"
+                        "（market-words.md §7・pipeline.md 段6d）。"
+                    )
+                issues.append(Issue("MARKET", f"{label}の句「{phrase}」: この句は集めた投稿（{total}本）に0本です。{guide}", details))
+                continue
+            # 長い句が、1〜2人（書き手が分からない時は1〜2本）の投稿にしか出ない時は、1人の文の写しに近い
+            # 決まりは market-words の表と同じ（tn_kb.py の MARKET_COPY_MIN_CHARS・MARKET_COPY_MAX_PEOPLE）
+            people = (counted["authors"] or 0) + int(counted["authors_unknown_posts"])
+            if len(tn_kb.compact_text(phrase)) >= tn_kb.MARKET_COPY_MIN_CHARS and people <= tn_kb.MARKET_COPY_MAX_PEOPLE:
+                copy_count += 1
+                if counted["authors"] is None:
+                    copy_amount = f"{counted['posts']}本（書き手は不明）"
+                else:
+                    copy_amount = f"{counted['posts']}本・{people_text(tn_kb, counted)}"
+                details.update({"kind": "market-copy", "authors": counted["authors"], "authors_unknown_posts": counted["authors_unknown_posts"]})
+                issues.append(
+                    Issue(
+                        "MARKET_COPY",
+                        f"{label}の句「{phrase}」: この句は集めた投稿に {copy_amount}だけです。"
+                        "1人の文の写しに近いので、3人以上が使う言い回しの形に替えるか、本人の言葉なら理由を1行残してください"
+                        "（market-words.md §8）。",
+                        details,
+                    )
+                )
+    info.update({"checked": True, "phrases": phrase_count, "zero_phrases": zero_count, "copy_phrases": copy_count})
+    info["message"] = (
+        f"集めた投稿 {total}本で、句 {phrase_count}個を数えました（0本の句 {zero_count}個・写しに近い句 {copy_count}個）"
+    )
+    return issues, info
+
+
 def print_human_result(result: Dict[str, Any]) -> None:
     label = "Threads" if result["command"] == "threads" else "note"
     print(f"{label} の検査結果")
@@ -1011,6 +1136,8 @@ def print_human_result(result: Dict[str, Any]) -> None:
             f"合計: {result['total_chars']}字 / # 見出し {result['headings']['h1']}個 / "
             f"## 見出し {result['headings']['h2']}個 / CTA {result['cta']['line_count']}行"
         )
+    if "market" in result:
+        print(f"市場の言葉の確かめ: {result['market']['message']}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1023,12 +1150,14 @@ def build_parser() -> argparse.ArgumentParser:
     threads_parser.add_argument("file", type=Path, metavar="FILE", help="検査する UTF-8 ファイル")
     threads_parser.add_argument("--settings", type=Path, help="00_わたしの設定.md")
     threads_parser.add_argument("--json", action="store_true", help="JSON で表示する")
+    threads_parser.add_argument("--market", type=Path, metavar="DIR", help="マイナレッジ（集めた投稿で1行目の句を数える）")
 
     note_parser = subparsers.add_parser("note", help="note 原稿を検査する")
     note_parser.add_argument("file", type=Path, metavar="FILE", help="検査する UTF-8 ファイル")
     note_parser.add_argument("--target-chars", type=int, help="目標字数")
     note_parser.add_argument("--settings", type=Path, help="00_わたしの設定.md")
     note_parser.add_argument("--json", action="store_true", help="JSON で表示する")
+    note_parser.add_argument("--market", type=Path, metavar="DIR", help="マイナレッジ（集めた投稿で題と見出しの句を数える）")
     return parser
 
 
@@ -1040,6 +1169,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result, exit_code = check_threads(args.file, args.settings)
         else:
             result, exit_code = check_note(args.file, args.settings, args.target_chars)
+        if args.market is not None:
+            market_issues, market_info = market_review(args.command, args.file, args.market)
+            result["review_candidates"].extend(issue.as_dict() for issue in market_issues)
+            result["summary"]["review_candidate_count"] = len(result["review_candidates"])
+            result["market"] = market_info
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:

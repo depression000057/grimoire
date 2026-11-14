@@ -26,6 +26,8 @@
 4. `references/knowledge/sales-launch-evergreen.md` の全文（2回目以降のローンチ・再販・売るための動画・値段の段で迷った時は §9）
 5. LINE を使っている、または使う予定なら `references/knowledge/line-operations.md`（どこで人が減っているかは §1、ステップ配信は §4、届ける前の点検は §6）
 
+告知の投稿・申し込みページ・LINE の配信の言葉は、集めた伸びた投稿の言葉（`ティルナノーグ_マイナレッジ/市場の言葉.md`）のまま使い、品質工程の段6d で1行目と見出しを句のまま数える（`references/quality/market-words.md`）。
+
 ローンチ中に出すメール・LINE の配信は `references/sales-patterns/step-mail.md`（M1〜M4）の型で、申し込みページ・LP は `references/sales-patterns/letter-structures.md` の売る側の型で組む（どちらも `references/sales-patterns/guide.md` の手順で設計シートを作ってから書く）。
 
 ## §3 ローンチ計画
