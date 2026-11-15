@@ -11,6 +11,10 @@
   （本文）
   採点: フック=8 具体=20 一次=14 読者=11
 
+ツリーにする投稿は、パートの区切りに「### ツリー2」のような見出しか「---」の行を置く。長さの点は、1本目（最初の区切りの前まで。
+単発ならその投稿）が100字以下なら10点、それ以外は全体の字数で 360字以下＝10／361〜460字＝7／461〜520字＝4／それ以外＝1
+（講座の第2回: 本文は2〜3行・50〜100字）。
+
 使い方:
   python3 check_post.py 投稿.md
   python3 check_post.py 投稿.md --past 過去の投稿.md
@@ -101,13 +105,25 @@ def opening_from_hook(hook10: int) -> int:
     return 4
 
 
+TREE_HEADING_RE = re.compile(r"(?m)^[ \t]*(?:#{1,6}[ \t]*ツリー|-{3,}[ \t]*$)")
+FIRST_PART_MAX = 100  # 1本目（本文）がこの字数以下なら長さは満点（講座の第2回: 本文は2〜3行・50〜100字）
+
+
+def first_part(body: str) -> str:
+    """1本目（本文）。「### ツリー2」のような見出しか「---」の行の前まで。区切りが無ければ投稿の全部。"""
+    match = TREE_HEADING_RE.search(body)
+    return (body[:match.start()] if match else body).strip()
+
+
 def score_length(body: str) -> int:
-    n = len(body)
-    if 140 <= n <= 360:
+    if len(first_part(body)) <= FIRST_PART_MAX:
         return 10
-    if 100 <= n < 140 or 360 < n <= 460:
+    n = len(body)
+    if n <= 360:
+        return 10
+    if n <= 460:
         return 7
-    if 60 <= n < 100 or 460 < n <= 520:
+    if n <= 520:
         return 4
     return 1
 
@@ -186,7 +202,7 @@ def check(posts, past_texts):
             status = "採点の値が表の段階と違う（具体20/12/4・一次20/14/5・読者15/11/3）: " + "・".join(off_step)
             total = None
         results.append({
-            "no": i + 1, "header": header, "chars": len(body), "first_line": first,
+            "no": i + 1, "header": header, "chars": len(body), "first_part_chars": len(first_part(body)), "first_line": first,
             "mechanical": mech, "judge": judge, "missing_judge": missing,
             "duplicate_ratio": round(dup, 2), "total": total, "status": status,
             "safety": safety, "temporal": temporal, "first_line_notes": notes,

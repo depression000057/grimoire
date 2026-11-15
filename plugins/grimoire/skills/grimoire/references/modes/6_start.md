@@ -158,7 +158,7 @@
 | 26 | 無料で渡している物・有料の鑑定の値段・LINE の配信ツール | `7_kantei.md` → `kantei/funnel.md`（診断ページは `diagnosis-page.md`、配信文は `line-utage.md`） | 導線の設計シート・診断ページ・LINE の配信文 |
 | 27 | GPTs の指示文・知識ファイル・実際に出した鑑定結果1つ | `7_kantei.md` → `kantei/gpts-migration.md` | 移した鑑定のレシピ（`ティルナノーグ_マイナレッジ/鑑定/`） |
 | 28 | 今の LINE の流れ（登録の入口・登録直後に届く物・配信の頻度）と、分かる数字（登録・申し込み・参加） | `line-operations.md` §1 で止まっている段を決め、その段の節で打ち手を1つ選ぶ | 相談の出し方（§5） |
-| 29 | アカウントを作った日・今のフォロワー数・これまでの投稿の本数 | `threads-account-ops.md` §8（立ち上げの4段）で今の段を決める | 今の段と、次の段へ進むまでにやること（1〜2週間分） |
+| 29 | アカウントを作った日・今のフォロワー数・これまでの投稿の本数 | `threads-account-ops.md` §8（立ち上げの4段）で今の段を決める。決める前に、索引（`references/course/索引.md`）の stage `account` のカードを読む。手順書とカードが食い違ったら、カードのとおりにする | 今の段と、次の段へ進むまでにやること（1〜2週間分） |
 | 30 | 伸びている投稿の本文と数字（貼ってもらう。まだ無ければ `kantei/research.md` の「利用者への案内」で集め方を伝える） | `4_grow.md` §1「市場の投稿の受け取り」で保存し、10本以上なら `market-words` で表を作る（`references/quality/market-words.md`） | よく出る言い回し・1行目の形・文末の形の表と、次の投稿でそのまま使える1行目の案3つ |
 
 売る文章が絡む番号は、`references/sales-patterns/guide.md` の型も使う。10・14 は `letter-structures.md` の売る側と本編の型と設計シート、11・12 の原因探しは guide の「既存の文章の添削・売れない理由の診断」の行（`education.md` で足りない教育、`persuasion.md` で訴求と論理の抜けを見る）、15・16 で出すメールは `step-mail.md`、17 で作る申し込みページは `letter-structures.md` の売る側の型。

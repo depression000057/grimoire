@@ -7,7 +7,7 @@
 | 依頼 | 出す物 | 分量 | 書式 |
 |---|---|---|---|
 | コメント・LINEの無料鑑定 | 一言鑑定 | 3〜4文・150字以内 | 本文のみ |
-| LINE登録直後の無料鑑定・お試し | 手紙版 | 400〜700字 | `.grimoire/assets/kantei/kantei-letter-template.md` |
+| LINE登録直後の無料鑑定・お試し | 手紙版 | 300〜500字 | `.grimoire/assets/kantei/kantei-letter-template.md` |
 | 有料：基本の鑑定書 | 鑑定書 | 1,500〜2,500字 | `.grimoire/assets/kantei/kantei-sho-template.md` |
 | 有料：1年の流れ | 年運の鑑定書 | 2,500〜4,000字 | `.grimoire/assets/kantei/kantei-year-template.md` |
 | 有料：相性 | 相性の鑑定書 | 2,000〜3,000字 | `.grimoire/assets/kantei/kantei-aishou-template.md` |
@@ -73,7 +73,7 @@ python3 .grimoire/scripts/kantei/tarot.py --spread 3 --labels 状況,壁,助言
 
 ## 手紙版（無料のお試し・LINE登録直後）
 
-- 400〜700字。「〇〇さんへ」で始まる手紙の形
+- 300〜500字（講座の第3回: LINE の1通目の見立ては300〜500字）。「〇〇さんへ」で始まる手紙の形
 - ライフパスの持ち味1つ → 今の時期 → 相談への一言 → 今週の一歩 → 「もっと詳しく見たい時は」の一行（導線で決めた有料鑑定の名前）
 - 手紙版で全部を言い切らない。有料の鑑定書で深める所（つまずきやすい所の理由・月ごとの流れ）を残す
 
