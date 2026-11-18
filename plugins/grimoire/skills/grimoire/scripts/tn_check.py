@@ -1107,6 +1107,163 @@ def market_review(command: str, path: Path, directory: Path) -> Tuple[List[Issue
     return issues, info
 
 
+TEHON_COPY_MIN_CHARS = 12
+TEHON_LENGTH_MAX_RATIO = 1.10
+
+
+def compact_body_for_tehon(text: str) -> str:
+    """見出し・区切り・空白を除いた本文文字列を返す。"""
+    cleaned = remove_html_comments(text)
+    pieces: List[str] = []
+    for raw in cleaned.splitlines():
+        s = raw.strip()
+        if not s or s == "---" or s.startswith("#"):
+            continue
+        if s.startswith("## 提出メモ"):
+            break
+        pieces.append("".join(s.split()))
+    return "".join(pieces)
+
+
+def longest_common_substrings(source: str, reference: str, min_len: int = TEHON_COPY_MIN_CHARS) -> List[str]:
+    """source と reference の両方に現れる min_len 文字以上の極大共通部分文字列を返す。"""
+    if len(source) < min_len or len(reference) < min_len:
+        return []
+    found: List[str] = []
+    i = 0
+    while i <= len(source) - min_len:
+        chunk = source[i : i + min_len]
+        if chunk in reference:
+            end = i + min_len
+            while end < len(source) and source[i : end + 1] in reference:
+                end += 1
+            hit = source[i:end]
+            if hit not in found:
+                found.append(hit)
+            i = end
+        else:
+            i += 1
+    return found
+
+
+def is_market_idiom_3plus(tn_kb: Any, market_posts: Sequence[Any], phrase: str) -> bool:
+    if not market_posts:
+        return False
+    counted = tn_kb.count_phrase(market_posts, phrase)
+    if not counted["posts"]:
+        return False
+    if counted["authors"] is None:
+        return int(counted["posts"]) >= 3
+    return int(counted["authors"]) >= 3
+
+
+def tehon_review(
+    command: str,
+    path: Path,
+    tehon_path: Path,
+    market_dir: Optional[Path] = None,
+) -> Tuple[List[Issue], Dict[str, Any]]:
+    tehon_raw = read_text(tehon_path)
+    tehon_compact = compact_body_for_tehon(tehon_raw)
+    tehon_chars = len(tehon_compact)
+    if tehon_chars == 0:
+        raise InputError(f"手本ファイルに本文がありません: {tehon_path}")
+
+    tn_kb: Any = None
+    market_posts: Sequence[Any] = ()
+    if market_dir is not None and market_dir.exists():
+        tn_kb = load_market_module()
+        try:
+            market_posts, _ = tn_kb.load_market_posts(market_dir)
+        except Exception:
+            market_posts = ()
+
+    issues: List[Issue] = []
+    text = read_text(path)
+    copy_hits_total = 0
+    idiom_skipped = 0
+    over_length_count = 0
+
+    if command == "threads":
+        posts = split_thread_posts(text)
+        for post_number, post in enumerate(posts, start=1):
+            post_body = "".join(
+                "".join(ln.strip().split())
+                for part in post.parts
+                for _, ln in visible_source_lines(part.source_lines)
+                if ln.strip()
+            )
+            post_chars = sum(
+                count_without_newlines("\n".join(ln for _, ln in visible_source_lines(part.source_lines)))
+                for part in post.parts
+            )
+            hits = longest_common_substrings(post_body, tehon_compact, TEHON_COPY_MIN_CHARS)
+            for hit in hits:
+                if tn_kb is not None and is_market_idiom_3plus(tn_kb, market_posts, hit):
+                    idiom_skipped += 1
+                    continue
+                copy_hits_total += 1
+                issues.append(
+                    Issue(
+                        "TEHON_COPY",
+                        f"投稿{post_number}: 手本と{len(hit)}字一致しています（「{hit}」）。"
+                        "3人以上が使う決まり文句でなければ、中身や自分の言い方に替えてください（market-words.md §6・§8）。",
+                        {"post": post_number, "phrase": hit, "length": len(hit)},
+                    )
+                )
+            limit_chars = int(tehon_chars * TEHON_LENGTH_MAX_RATIO)
+            if post_chars > limit_chars:
+                over_length_count += 1
+                issues.append(
+                    Issue(
+                        "TEHON_LENGTH",
+                        f"投稿{post_number}: {post_chars}字で、手本（{tehon_chars}字）の1.1倍（{limit_chars}字）を超えています。"
+                        "直しで説明が増えていないか見直し、手本の字数に近づけてください（pipeline.md 段2・段8）。",
+                        {"post": post_number, "chars": post_chars, "tehon_chars": tehon_chars, "limit_chars": limit_chars},
+                    )
+                )
+    else:
+        body_compact = compact_body_for_tehon(text)
+        body_chars = len(body_compact)
+        for hit in longest_common_substrings(body_compact, tehon_compact, TEHON_COPY_MIN_CHARS):
+            if tn_kb is not None and is_market_idiom_3plus(tn_kb, market_posts, hit):
+                idiom_skipped += 1
+                continue
+            copy_hits_total += 1
+            issues.append(
+                Issue(
+                    "TEHON_COPY",
+                    f"手本と{len(hit)}字一致しています（「{hit}」）。"
+                    "3人以上が使う決まり文句でなければ、自分の言い方に替えてください（market-words.md §6・§8）。",
+                    {"phrase": hit, "length": len(hit)},
+                )
+            )
+        limit_chars = int(tehon_chars * TEHON_LENGTH_MAX_RATIO)
+        if body_chars > limit_chars:
+            over_length_count += 1
+            issues.append(
+                Issue(
+                    "TEHON_LENGTH",
+                    f"本文が{body_chars}字で、手本（{tehon_chars}字）の1.1倍（{limit_chars}字）を超えています。"
+                    "手本の字数に近づけてください（pipeline.md 段2・段8）。",
+                    {"chars": body_chars, "tehon_chars": tehon_chars, "limit_chars": limit_chars},
+                )
+            )
+
+    info: Dict[str, Any] = {
+        "tehon": str(tehon_path),
+        "tehon_chars": tehon_chars,
+        "copy_hits": copy_hits_total,
+        "idiom_skipped": idiom_skipped,
+        "over_length": over_length_count,
+        "message": (
+            f"手本（{tehon_chars}字）と照合しました（12字以上の一致 {copy_hits_total}件・"
+            f"決まり文句除外 {idiom_skipped}件・字数超過 {over_length_count}件）"
+        ),
+    }
+    return issues, info
+
+
 def print_human_result(result: Dict[str, Any]) -> None:
     label = "Threads" if result["command"] == "threads" else "note"
     print(f"{label} の検査結果")
@@ -1138,6 +1295,8 @@ def print_human_result(result: Dict[str, Any]) -> None:
         )
     if "market" in result:
         print(f"市場の言葉の確かめ: {result['market']['message']}")
+    if "tehon" in result:
+        print(f"手本との照合: {result['tehon']['message']}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1151,6 +1310,7 @@ def build_parser() -> argparse.ArgumentParser:
     threads_parser.add_argument("--settings", type=Path, help="00_わたしの設定.md")
     threads_parser.add_argument("--json", action="store_true", help="JSON で表示する")
     threads_parser.add_argument("--market", type=Path, metavar="DIR", help="マイナレッジ（集めた投稿で1行目の句を数える）")
+    threads_parser.add_argument("--tehon", type=Path, metavar="FILE", help="手本にした投稿の原文ファイル（12字一致と字数比を検査する）")
 
     note_parser = subparsers.add_parser("note", help="note 原稿を検査する")
     note_parser.add_argument("file", type=Path, metavar="FILE", help="検査する UTF-8 ファイル")
@@ -1158,6 +1318,7 @@ def build_parser() -> argparse.ArgumentParser:
     note_parser.add_argument("--settings", type=Path, help="00_わたしの設定.md")
     note_parser.add_argument("--json", action="store_true", help="JSON で表示する")
     note_parser.add_argument("--market", type=Path, metavar="DIR", help="マイナレッジ（集めた投稿で題と見出しの句を数える）")
+    note_parser.add_argument("--tehon", type=Path, metavar="FILE", help="手本にした記事の原文ファイル（12字一致と字数比を検査する）")
     return parser
 
 
@@ -1174,6 +1335,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result["review_candidates"].extend(issue.as_dict() for issue in market_issues)
             result["summary"]["review_candidate_count"] = len(result["review_candidates"])
             result["market"] = market_info
+        if args.tehon is not None:
+            tehon_issues, tehon_info = tehon_review(args.command, args.file, args.tehon, args.market)
+            result["review_candidates"].extend(issue.as_dict() for issue in tehon_issues)
+            result["summary"]["review_candidate_count"] = len(result["review_candidates"])
+            result["tehon"] = tehon_info
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
