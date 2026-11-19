@@ -1,7 +1,7 @@
 ---
 name: grimoire
 description: ティルナノーグ受講生のグリモワール。Threads投稿とnote・LP・ステップメール・LINE配信と占いの鑑定書を、本人の設定と手元で育つナレッジで作る。文字起こし・講師FB・数字・直した文を渡されたら、言われなくても覚えて次から使う。「グリモワール起動」「始動」で悩み別のメニューを出す。「Threads」「note」「ローンチ」「伸びない」「設定」「鑑定」「グリモワール更新」でも起動。
-allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(python3 .grimoire/scripts/tn_design_check.py *) Bash(sh .grimoire/scripts/register.sh) Bash(sh .grimoire/scripts/update.sh) Bash(python3 .grimoire/scripts/kantei/numerology.py *) Bash(python3 .grimoire/scripts/kantei/tarot.py *) Bash(python3 .grimoire/scripts/kantei/check_post.py *) Bash(python3 .grimoire/scripts/kantei/build_diagnosis_page.py *) Bash(python3 .grimoire/scripts/kantei/weekly_report.py *) Bash(python3 .grimoire/scripts/kantei/frames.py *) Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
+allowed-tools: Bash(python3 .grimoire/scripts/tn_kb.py *) Bash(python3 .grimoire/scripts/tn_check.py *) Bash(python3 .grimoire/scripts/tn_paste.py *) Bash(python3 .grimoire/scripts/tn_design_check.py *) Bash(sh .grimoire/scripts/register.sh) Bash(sh .grimoire/scripts/update.sh) Bash(python3 .grimoire/scripts/kantei/numerology.py *) Bash(python3 .grimoire/scripts/kantei/tarot.py *) Bash(python3 .grimoire/scripts/kantei/check_post.py *) Bash(python3 .grimoire/scripts/kantei/build_diagnosis_page.py *) Bash(python3 .grimoire/scripts/kantei/weekly_report.py *) Bash(python3 .grimoire/scripts/kantei/frames.py *) mcp__buzzreco__* mcp__threads-client__* mcp__threads_client__* Read Glob Grep Edit(/ティルナノーグ_マイナレッジ/**) Edit(/ティルナノーグ_制作物/**)
 ---
 
 # グリモワール（grimoire）

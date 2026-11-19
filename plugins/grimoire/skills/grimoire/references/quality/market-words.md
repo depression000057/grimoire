@@ -59,6 +59,13 @@ AI は、元の言葉を自分の言葉に訳し直して、それらしい言�
 
 あわせて、集め方の案内（`research.md` の案内）を1回だけ添える。同じ会話で2回は出さない（受講生の手を止めないため）。
 
+**バズレコ（伸びた投稿の検索道具・MCP）がつながっている環境の時**:
+会話で使える道具の中に `buzzreco_*`（`buzzreco_today_ideas`・`buzzreco_market_memo`・`buzzreco_search_posts`・`buzzreco_get_posts`・`buzzreco_phrase_count`・`buzzreco_check_draft`・`buzzreco_export_for_grimoire`）または `find_grown_posts`・`get_writing_brief`・`get_posts`・`check_market_phrases`・`check_draft` がある時は、受講生に手動で投稿を集めさせず、次の順で自動的に連携する（つながっていない環境では今まで通り `50_市場の投稿/` だけで進める）。
+
+1. **手元の投稿が10本未満の時**: `buzzreco_export_for_grimoire`（設定のジャンルと `max_followers=2000` を指定。または `find_grown_posts(sort='buzz_rate', max_followers=2000)` → `get_posts` の `grimoire_markdown`）で伸びた投稿を10〜15本取り出し、`tn_kb.py market-add` で `50_市場の投稿/` に保存してから `market-words` を動かす
+2. **書く前の市場の言葉と手本選び**: `buzzreco_market_memo`（または `get_writing_brief`）と `buzzreco_today_ideas` を呼び、今の季節・暦の切り口と市場の語を確認する。なぞる手本1本は `buzzreco_search_posts(max_followers=2000)` → `buzzreco_get_posts`（または `get_posts`）で全文とツリーの続きを取り、切らずに `_作業中/手本.md` に置く
+3. **書いた後の句の照合と点検**: §7 の句の数え上げでは `tn_kb.py market-count` とあわせて `buzzreco_phrase_count(phrases=[...])`（または `check_market_phrases`）で市場全体の人数を確かめ、仕上げでは `tn_check.py` に加えて `buzzreco_check_draft`（または `check_draft`）も通す
+
 ## §4 道具
 
 道具は作業フォルダ（最初の場所）で、次の形のまま1回に1つずつ動かす（`cd` で移らない・コマンドをつながない）。数えたい句が何個あっても、`--phrase` を並べて1回で数える。

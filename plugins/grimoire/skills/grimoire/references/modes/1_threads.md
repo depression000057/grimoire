@@ -22,7 +22,7 @@
 2. カード: stage `threads-plan` `threads-hook` `threads-body` `threads-cta`（ツリーなら `threads-tree` も）。マイナレッジの `索引.md` → `references/course/索引.md` の順に、各 stage の上から読む（Python が動くなら `tn_kb.py select`）
 3. お手本: マイナレッジの `10_お手本/` から、今回の型に近い投稿を1〜2本。無ければ `assets/golden-samples/` から1〜2本。全文を読む
 4. `references/knowledge/threads-posting.md` の §1（1行目）・§3（型カタログ）・§5（CTA）・§6（企画の混ぜ方）・§8（投稿前チェック）
-5. 市場の言葉の表 `ティルナノーグ_マイナレッジ/市場の言葉.md`（書く前に毎回 `market-words` を1回動かして作り直してから読む。集めた投稿が10本未満なら、無いまま書き進める）。読み方と、伸びた投稿1本をなぞる書き方は `references/quality/market-words.md` §5・§6
+5. 市場の言葉の表 `ティルナノーグ_マイナレッジ/市場の言葉.md`（書く前に毎回 `market-words` を1回動かして作り直してから読む。バズレコの道具 `buzzreco_*` や `get_writing_brief` が使える環境では、`references/quality/market-words.md` §3 のとおり自動でバズレコから市場の言葉と小規模で伸びた手本を引いて補う。どちらも無く集めた投稿が10本未満なら、無いまま書き進める）。読み方と、伸びた投稿1本をなぞる書き方は `references/quality/market-words.md` §5・§6
 
 ## §3 企画
 
@@ -85,7 +85,7 @@
 4. 事実と声の照合（`references/quality/pipeline.md` §3 段6b）: 本人について書いた期間・回数・数字・結果・読者の反応を、設定・お手本・実績と1つずつ照らし、裏付けの無い盛りを消す。改行の癖・一人称・絵文字を設定の「声」と照らす
 5. ふわっとの点検と強さ（段6c）: 言い切り・最大級・普通に考える・攻守の分け方（`absolute-rules.md` §6・§7）。まとめて作った時は、強くする5つと日付、および着地（CTA）の種類が何本に入ったかを数える
 6. 市場の言葉の確かめ（段6d）: 各投稿の1行目を、書いた句のまま `python3 <スキルのフォルダ>/scripts/tn_kb.py market-count <マイナレッジ> --phrase 句 …` で数え、0本の句を市場の句の形に直す（`references/quality/market-words.md` §7）
-7. 機械チェック: `python3 <スキルのフォルダ>/scripts/tn_check.py threads <ファイル> --settings <マイナレッジ>/00_わたしの設定.md --market <マイナレッジ>`（集めた投稿が無い時は `--market` を外してよい。`_作業中/手本.md` を置いて1本なぞった時は `--tehon ティルナノーグ_制作物/_作業中/手本.md` も付ける）。目視候補 `MARKET`・`MARKET_COPY`・`TEHON_COPY`・`TEHON_LENGTH` は1件ずつ記録する（`references/quality/market-words.md` §6・§7）。動かない時は `references/knowledge/threads-posting.md` §8 のチェックリストを1本ずつ当てる
+7. 機械チェック: `python3 <スキルのフォルダ>/scripts/tn_check.py threads <ファイル> --settings <マイナレッジ>/00_わたしの設定.md --market <マイナレッジ>`（集めた投稿が無い時は `--market` を外してよい。`_作業中/手本.md` を置いて1本なぞった時は `--tehon ティルナノーグ_制作物/_作業中/手本.md` も付ける。バズレコの `buzzreco_check_draft` または `check_draft` が使える環境ではあわせて通し、5本まとめ時の攻守ねじれや1行目の市場本数も確かめる）。目視候補 `MARKET`・`MARKET_COPY`・`TEHON_COPY`・`TEHON_LENGTH` は1件ずつ記録する（`references/quality/market-words.md` §6・§7）。動かない時は `references/knowledge/threads-posting.md` §8 のチェックリストを1本ずつ当てる
 8. 最後に、読者になったつもりで1本ずつ読み、「ここでスクロールを止めるか」「最後まで読むか」を自分に聞く。止まらない投稿は、1行目から作り直す。聞き手テスト（`pipeline.md` §3 段8）も通し、直しで手本より長くなっていないか確かめる
 
 ## §8 提出
