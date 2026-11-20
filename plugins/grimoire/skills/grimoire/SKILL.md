@@ -50,6 +50,7 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | 他人の伸びた投稿（参考にしているアカウントの投稿）が貼られた／「伸びている投稿を集めた」 | 4 育てる（カードにせず、`market-add` で市場の投稿として保存する） | `references/modes/4_grow.md` §1「市場の投稿の受け取り」 |
 | 投稿や note の数字が貼られた／「伸びない」「どれが良かった？」 | 5 振り返り | `references/modes/5_review.md` |
 | 「Threads の投稿作って」「10本作って」「ツリーにして」「この投稿直して」 | 1 Threads | `references/modes/1_threads.md` |
+| 「X のアカウント設計」「X を伸ばしたい」「X の毎日の運用」「X のインプが落ちた」 | X 運用・アカウント設計 | `references/knowledge/x-account-ops.md`（ポストの型は `references/sales-patterns/x-posts.md`） |
 | 「note 書いて」「有料 note」「タイトル案」「セールスレター」 | 2 note | `references/modes/2_note.md` |
 | 「ローンチしたい」「販売期間の計画」「エバーにしたい」「導線を作りたい」 | 3 ローンチ→エバー | `references/modes/3_launch-evergreen.md` |
 | 「セールスレター」「LP」「申し込みページ」「ステップメール」「X のポスト」「リールの冒頭」「教育が足りているか見て」「訴求を整理して」「この文章が売れない理由を見て」 | 売れる型（型を選び、設計シートの枠を埋めてから書く） | `references/sales-patterns/guide.md` |
@@ -141,7 +142,8 @@ Threads で読者を集め、note を売り、売れる仕組みを常設にす�
 | `references/modes/0_setup.md` 〜 `7_kantei.md` | 各モードに入った時（全文） |
 | `references/sales-patterns/guide.md` | 売る文章（note の無料部分と本編・LP・セールスレター・ステップメール・SNS の投稿・冒頭の一言）を型で組む時。型は同じフォルダの各ファイル、設計シートは `assets/sales-design-sheet.md`、点検は `scripts/tn_design_check.py` |
 | `references/knowledge/threads-posting.md` | Threads 投稿を書く時 |
-| `references/knowledge/threads-account-ops.md` | アカウント設計・運用・分析の相談の時。作ったばかりのアカウントは §8 |
+| `references/knowledge/threads-account-ops.md` | Threads のアカウント設計・運用・分析の相談の時。作ったばかりのアカウントは §8 |
+| `references/knowledge/x-account-ops.md` | X（旧Twitter）のアカウント設計・日々の運用・アルゴリズム対策の相談の時 |
 | `references/knowledge/sales-launch-evergreen.md` | 導線・ローンチ・エバー化の時。再販の判断・売るための動画・値段の段は §9 |
 | `references/knowledge/line-operations.md` | LINE の登録から購入・返信・送り分けまでの運用の時 |
 | `references/kantei/`・`assets/kantei/`・`scripts/kantei/` | 占い・鑑定のモード（7）の手順書・書式・道具。入口は `references/modes/7_kantei.md` |
