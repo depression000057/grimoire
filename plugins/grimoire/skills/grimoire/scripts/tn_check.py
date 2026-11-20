@@ -9,6 +9,7 @@ import re
 import sys
 import unicodedata
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -728,6 +729,14 @@ def check_threads(path: Path, settings: Optional[Path]) -> Tuple[Dict[str, Any],
                 )
         first_line = first_content_line(post)
         reviews.extend(first_line_review_issues(first_line, post_number))
+        if post.parts and re.search(r"https?://\S+", post.parts[0].text, re.IGNORECASE):
+            reviews.append(
+                Issue(
+                    "URL_IN_FIRST_POST",
+                    f"投稿{post_number}の1投稿目に外部URLが直貼りされています。表示回数低下・凍結リスク回避のため、URLはプロフや固定投稿へ移してください。",
+                    {"post": post_number, "part": 1},
+                )
+            )
         context = {"post": post_number}
         visible_lines = visible_source_lines(post.source_lines)
         reviews.extend(verify_fact_review_issues(visible_lines, context))
@@ -761,6 +770,23 @@ def check_threads(path: Path, settings: Optional[Path]) -> Tuple[Dict[str, Any],
                 "parts": part_summaries,
             }
         )
+
+    if len(posts) >= 2:
+        for idx_a in range(len(posts)):
+            head_a = post_summaries[idx_a]["first_line"]
+            body_a = posts[idx_a].text
+            for idx_b in range(idx_a + 1, len(posts)):
+                head_b = post_summaries[idx_b]["first_line"]
+                body_b = posts[idx_b].text
+                sim = SequenceMatcher(None, body_a, body_b).ratio()
+                if (head_a and head_a == head_b) or sim >= 0.72:
+                    reviews.append(
+                        Issue(
+                            "CROSS_POST_DUPLICATE",
+                            f"投稿{idx_a + 1}と投稿{idx_b + 1}の文面が酷似しています（類似度 {sim:.2f}）。複数アカウントや予約まとめ出しでの重複回避のため、1行目と具体例を別角度に替えてください。",
+                            {"posts": [idx_a + 1, idx_b + 1], "similarity": round(sim, 3)},
+                        )
+                    )
 
     result = {
         "command": "threads",
